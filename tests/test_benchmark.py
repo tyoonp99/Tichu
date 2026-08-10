@@ -1,5 +1,5 @@
 from benchmark import build_parser, make_agent, summarize
-from gym_agents import FuegiHeuristicAgent
+from gym_agents import FuegiHeuristicAgent, FuegiMctsAgent
 
 
 def test_benchmark_parser_configures_paired_matches():
@@ -24,6 +24,10 @@ def test_benchmark_parser_configures_paired_matches():
 
 def test_benchmark_can_create_fuegi_agent():
     assert isinstance(make_agent("fuegi"), FuegiHeuristicAgent)
+
+
+def test_benchmark_can_create_fuegi_mcts_agent():
+    assert isinstance(make_agent("fuegi-mcts"), FuegiMctsAgent)
 
 
 def test_benchmark_summary_uses_team_a_perspective():

@@ -14,7 +14,7 @@ from gym_tichu.envs.internals import (
     TichuState,
 )
 
-from .agents import DefaultGymAgent
+from .agents import BaseMonteCarloAgent, DefaultGymAgent
 
 
 logger = logging.getLogger(__name__)
@@ -184,3 +184,17 @@ class FuegiHeuristicAgent(DefaultGymAgent):
 
     def explain_action(self, state: TichuState, action: PlayerAction):
         return self.scorer.score(state, action)
+
+
+class FuegiMctsAgent(BaseMonteCarloAgent):
+    """MCTS agent using Fuegi trading and team-support strategies."""
+
+    def __init__(self, search_algorithm, iterations=100, max_time=float("inf"), cheat=False):
+        super().__init__(
+            search_algorithm=search_algorithm,
+            iterations=iterations,
+            max_time=max_time,
+            cheat=cheat,
+        )
+        self.trade = fuegi_trading_strategy
+        self.give_dragon_away = give_dragon_to_opponent_with_more_cards

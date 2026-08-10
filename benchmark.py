@@ -11,12 +11,13 @@ from gym_agents import (
     BalancedRandomAgent,
     BaseMonteCarloAgent,
     FuegiHeuristicAgent,
+    FuegiMctsAgent,
     RandomAgent,
 )
-from gym_agents.mcts import make_default_ismctsearch
+from gym_agents.mcts import make_default_ismctsearch, make_fuegi_ismctsearch
 
 
-AGENT_NAMES = ("random", "balanced-random", "fuegi", "mcts")
+AGENT_NAMES = ("random", "balanced-random", "fuegi", "mcts", "fuegi-mcts")
 
 
 def make_agent(name, *, iterations=10, max_time=0.2):
@@ -29,6 +30,14 @@ def make_agent(name, *, iterations=10, max_time=0.2):
     if name == "mcts":
         search = make_default_ismctsearch(name="BenchmarkMcts")
         return BaseMonteCarloAgent(
+            search,
+            iterations=iterations,
+            max_time=max_time,
+            cheat=False,
+        )
+    if name == "fuegi-mcts":
+        search = make_fuegi_ismctsearch(name="BenchmarkFuegiMcts")
+        return FuegiMctsAgent(
             search,
             iterations=iterations,
             max_time=max_time,

@@ -15,6 +15,7 @@ from typing import Optional, Union, Hashable, NewType, TypeVar, Tuple, List, Dic
 from math import sqrt, log
 from time import time
 from .combination_weights import CombinationWeights
+from .fuegi import FuegiActionScorer
 
 from profilehooks import timecall, profile
 
@@ -498,9 +499,23 @@ class UCBTreePolicy(TreePolicy, metaclass=abc.ABCMeta):
                     max_val = val
                     max_actions = [action]
 
-        next_action = random.choice(max_actions)
+        next_action = self.break_tree_selection_tie(state, max_actions)
         # logger.debug(f"Tree selection -> {next_action}")
         return next_action
+
+    def break_tree_selection_tie(self, state: TichuState, actions: List[PlayerAction]) -> PlayerAction:
+        return random.choice(actions)
+
+
+class FuegiUCBTreePolicy(UCBTreePolicy, metaclass=abc.ABCMeta):
+
+    def break_tree_selection_tie(self, state: TichuState, actions: List[PlayerAction]) -> PlayerAction:
+        scorer = FuegiActionScorer()
+        scored_actions = (
+            scorer.score(state, action)
+            for action in sorted(actions, key=repr)
+        )
+        return max(scored_actions, key=lambda scored: scored.total).action
 
 
 class NoRolloutPolicy(UCBTreePolicy, metaclass=abc.ABCMeta):
@@ -634,6 +649,22 @@ class RandomRolloutPolicy(RolloutPolicy, metaclass=abc.ABCMeta):
         return self.evaluate_state(rollout_state.random_rollout())
 
 
+class FuegiRolloutPolicy(RolloutPolicy, metaclass=abc.ABCMeta):
+
+    def rollout_action(self, state: TichuState) -> PlayerAction:
+        scorer = FuegiActionScorer()
+        scored_actions = (
+            scorer.score(state, action)
+            for action in sorted(state.possible_actions_list, key=repr)
+        )
+        return max(scored_actions, key=lambda scored: scored.total).action
+
+    def rollout_policy(self, state: TichuState) -> RewardVector:
+        rollout_state = RolloutTichuState.from_tichustate(state)
+        final_state = rollout_state.rollout(policy=self.rollout_action)
+        return self.evaluate_state(final_state)
+
+
 class NNRolloutPolicy(RolloutPolicy, metaclass=abc.ABCMeta):
 
     def __init__(self, *args, **kwargs):
@@ -717,6 +748,22 @@ class RelativeEvaluationPolicy(EvaluationPolicy, metaclass=abc.ABCMeta):
         return (r0, r1, r0, r1)
 
 
+class TeamPointDifferenceEvaluationPolicy(EvaluationPolicy, metaclass=abc.ABCMeta):
+    """Evaluate both partners by their normalized final team point difference."""
+
+    def evaluate_state(self, state: TichuState) -> RewardVector:
+        points = state.count_points()
+        assert points[0] == points[2] and points[1] == points[3]
+        team_zero_reward = (points[0] - points[1]) / 200
+        team_one_reward = -team_zero_reward
+        return (
+            team_zero_reward,
+            team_one_reward,
+            team_zero_reward,
+            team_one_reward,
+        )
+
+
 class RelativeNormalizedEvaluationPolicy(EvaluationPolicy, metaclass=abc.ABCMeta):
     def evaluate_state(self, state: TichuState) -> RewardVector:
         points = state.count_points()
@@ -792,6 +839,22 @@ class HighestAvgRewardBestActionPolicy(BestActionPolicy, metaclass=abc.ABCMeta):
             return record.total_reward[state.player_pos] / record.visit_count if record.visit_count else 0
 
 
+class FuegiBestActionPolicy(BestActionPolicy, metaclass=abc.ABCMeta):
+    """Blend rollout evidence with a small explainable heuristic prior."""
+
+    def action_val(self, state: TichuState, action: PlayerAction, record: UCB1Record):
+        if record.visit_count == 0:
+            return -float("inf")
+        if isinstance(action, PlayCombination) and len(action.combination) == len(
+            state.handcards[action.player_pos]
+        ):
+            return float("inf")
+
+        average_reward = record.total_reward[state.player_pos] / record.visit_count
+        heuristic_prior = FuegiActionScorer().score(state, action).total * 0.01
+        return average_reward + heuristic_prior
+
+
 # ##### Different Search Strategies
 def make_ismctsearch(name: str, nodeidpolicy, determinizationpolicy, treepolicy, rolloutpolicy, evaluationpolicy, bestactionpolicy, ret_class: bool=False):
 
@@ -805,6 +868,22 @@ def make_default_ismctsearch(name: str, nodeidpolicy=DefaultNodeIdPolicy, determ
 
     return make_ismctsearch(name=name, nodeidpolicy=nodeidpolicy, determinizationpolicy=determinizationpolicy, treepolicy=treepolicy,
                             rolloutpolicy=rolloutpolicy, evaluationpolicy=evaluationpolicy, bestactionpolicy=bestactionpolicy, ret_class=ret_class)
+
+
+def make_fuegi_ismctsearch(name: str, nodeidpolicy=DefaultNodeIdPolicy, determinizationpolicy=RandomDeterminePolicy,
+                           treepolicy=FuegiUCBTreePolicy, rolloutpolicy=FuegiRolloutPolicy,
+                           evaluationpolicy=TeamPointDifferenceEvaluationPolicy,
+                           bestactionpolicy=FuegiBestActionPolicy, ret_class: bool=False):
+    return make_ismctsearch(
+        name=name,
+        nodeidpolicy=nodeidpolicy,
+        determinizationpolicy=determinizationpolicy,
+        treepolicy=treepolicy,
+        rolloutpolicy=rolloutpolicy,
+        evaluationpolicy=evaluationpolicy,
+        bestactionpolicy=bestactionpolicy,
+        ret_class=ret_class,
+    )
 
 
 def make_best_ismctsearch(name: str, nodeidpolicy=DefaultNodeIdPolicy, determinizationpolicy=SingleDeterminePolicy, treepolicy=UCBTreePolicy,
