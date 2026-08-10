@@ -55,6 +55,14 @@ To watch a game amongst four agents:
 python play.py --lazy
 ```
 
+The default agents use the core random-rollout MCTS implementation and do not
+require the legacy neural-network dependencies. You can limit the search work
+for each decision, for example:
+
+```bash
+python play.py --lazy --target 100 --iterations 10 --max-time 0.2
+```
+
 More games can be found in the [game_starter.py](./game_starter.py)
 
 ## Train a Deep-Q-learning agent

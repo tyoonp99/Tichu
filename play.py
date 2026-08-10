@@ -3,32 +3,23 @@ Starts a game against the computer
 """
 import argparse
 import datetime
-import sys
-import os
-
 import logging
-from profilehooks import timecall
+from pathlib import Path
 
 from gym_agents import BaseMonteCarloAgent, HumanInputAgent
-from gym_agents.mcts import make_best_ismctsearch
-
-this_folder = '/'.join(os.getcwd().split('/')[:])
-parent_folder = '/'.join(os.getcwd().split('/')[:-1])
-
-for p in [this_folder, parent_folder]:  # Adds the parent folder (ie. game) to the python path
-    if p not in sys.path:
-        sys.path.append(p)
+from gym_agents.mcts import make_default_ismctsearch
 
 from gamemanager import TichuGame
 import logginginit
 
 logger = logging.getLogger(__name__)
+PROJECT_DIR = Path(__file__).resolve().parent
 
 
-def make_ismcts_agent():
+def make_ismcts_agent(iterations: int=100, max_time: float=1):
     return BaseMonteCarloAgent(
-            make_best_ismctsearch(name='ISMCTS'),
-            iterations=100000, max_time=10, cheat=False
+            make_default_ismctsearch(name='ISMCTS'),
+            iterations=iterations, max_time=max_time, cheat=False
     )
 
 
@@ -50,24 +41,26 @@ def create_agent_against_agent(type1, type2)->TichuGame:
     return TichuGame(*agents)
 
 
-def human_against_ismcts(target_points: int):
-    agents = [HumanInputAgent(position=0), make_ismcts_agent(), make_ismcts_agent(), make_ismcts_agent()]
+def human_against_ismcts(target_points: int, iterations: int=100, max_time: float=1):
+    agents = [
+        HumanInputAgent(position=0),
+        *(make_ismcts_agent(iterations, max_time) for _ in range(3)),
+    ]
     game = TichuGame(*agents)
 
     res = game.start_game(target_points=target_points)
     return res
 
 
-def ismcts_against_ismcts(target_points: int):
-
-    agents = [make_ismcts_agent(), make_ismcts_agent(), make_ismcts_agent(), make_ismcts_agent()]
+def ismcts_against_ismcts(target_points: int, iterations: int=100, max_time: float=1):
+    agents = [make_ismcts_agent(iterations, max_time) for _ in range(4)]
     game = TichuGame(*agents)
 
     res = game.start_game(target_points=target_points)
     return res
 
 
-if __name__ == "__main__":
+def build_parser():
     parser = argparse.ArgumentParser(description='Play', allow_abbrev=False)
 
     parser.add_argument('--target', dest='target_points', type=int, required=False, default=1000,
@@ -79,18 +72,40 @@ if __name__ == "__main__":
     parser.add_argument('--cheat', dest='cheat', required=False, action='store_true',
                         help='When this flag is present, then you can see the handcards of the other players.')
 
-    args = parser.parse_args()
+    parser.add_argument('--iterations', type=int, default=100,
+                        help='Maximum MCTS iterations for each decision (default: 100).')
+
+    parser.add_argument('--max-time', type=float, default=1,
+                        help='Maximum MCTS search time per decision in seconds (default: 1).')
+
+    return parser
+
+
+def main(argv=None):
+    args = build_parser().parse_args(argv)
 
     start_ftime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-    log_folder_name = "{}/logs/game_starter_{}".format(this_folder, start_ftime)
+    log_folder_name = PROJECT_DIR / "logs" / "game_starter_{}".format(start_ftime)
 
     logging_mode = logginginit.HumanplayCheatMode if args.cheat or args.lazy else logginginit.HumanplayMode
 
-    logginginit.initialize_loggers(output_dir=log_folder_name, logging_mode=logging_mode, min_loglevel=logging.DEBUG)
+    logginginit.initialize_loggers(output_dir=str(log_folder_name), logging_mode=logging_mode, min_loglevel=logging.DEBUG)
 
     if args.lazy:
-        res = ismcts_against_ismcts(target_points=args.target_points)
+        res = ismcts_against_ismcts(
+            target_points=args.target_points,
+            iterations=args.iterations,
+            max_time=args.max_time,
+        )
     else:
-        res = human_against_ismcts(target_points=args.target_points)
+        res = human_against_ismcts(
+            target_points=args.target_points,
+            iterations=args.iterations,
+            max_time=args.max_time,
+        )
     print_game_outcome(res)
+
+
+if __name__ == "__main__":
+    main()
