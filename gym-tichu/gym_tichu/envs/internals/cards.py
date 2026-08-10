@@ -512,6 +512,10 @@ class CardSet(TypedFrozenSet):
                 # all trios higher than the played_on.any_card
                 yield from self.trios(played_on=played_on, contains_rank=contains_rank)
 
+            elif isinstance(played_on, FullHouse):
+                # all full houses with a higher trio
+                yield from self.fullhouses(played_on=played_on, contains_rank=contains_rank)
+
             elif isinstance(played_on, PairSteps):
                 # all higher pairsteps
                 yield from self.pairsteps(played_on=played_on, contains_rank=contains_rank)
@@ -545,7 +549,13 @@ class CardSet(TypedFrozenSet):
 
         # contains_rank = None
         if played_on:
-            singles = (Single(crds[0]) for crds in rank_dict.values())
+            def single_for_play(cards):
+                single = Single(cards[0])
+                if single.is_phoenix():
+                    single.set_phoenix_height(played_on.height + 0.5)
+                return single
+
+            singles = (single_for_play(crds) for crds in rank_dict.values())
             yield from (s for s in singles if s.can_be_played_on(played_on))
         else:
             # All singles

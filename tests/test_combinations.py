@@ -2,6 +2,7 @@ import pytest
 
 from gym_tichu.envs.internals.cards import (
     Card,
+    CardSet,
     Combination,
     FullHouse,
     Pair,
@@ -42,6 +43,18 @@ def test_phoenix_can_complete_pair():
     assert pair.contains_phoenix()
 
 
+def test_phoenix_single_is_half_a_rank_above_the_previous_single():
+    responses = list(
+        CardSet({Card.PHOENIX}).possible_combinations(
+            played_on=Single(Card.A_JADE)
+        )
+    )
+
+    assert len(responses) == 1
+    assert responses[0].cards == {Card.PHOENIX}
+    assert responses[0].height == 14.5
+
+
 def test_trio_requires_matching_ranks():
     trio = Trio(Card.SEVEN_JADE, Card.SEVEN_SWORD, Card.SEVEN_PAGODA)
 
@@ -64,6 +77,34 @@ def test_full_house_height_is_its_trio_height():
 
     assert full_house.height == 9
     assert len(full_house.cards) == 5
+
+
+def test_higher_full_house_is_generated_as_a_response():
+    played = FullHouse.from_cards(
+        {
+            Card.TWO_JADE,
+            Card.TWO_SWORD,
+            Card.NINE_JADE,
+            Card.NINE_SWORD,
+            Card.NINE_PAGODA,
+        }
+    )
+    hand = CardSet(
+        {
+            Card.SEVEN_JADE,
+            Card.SEVEN_SWORD,
+            Card.K_JADE,
+            Card.K_SWORD,
+            Card.K_PAGODA,
+        }
+    )
+
+    responses = list(hand.possible_combinations(played_on=played))
+
+    assert any(
+        isinstance(combination, FullHouse) and combination.height == 13
+        for combination in responses
+    )
 
 
 def test_straight_requires_five_consecutive_ranks():
