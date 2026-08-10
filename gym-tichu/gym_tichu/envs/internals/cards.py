@@ -1206,7 +1206,7 @@ class FullHouse(Combination):
         check_param(Card.PHOENIX not in cards, "can't make from cards when Phoenix is present")
         pair = None
         trio = None
-        for cs in CardSet(cards).rank_dict(values_only=True):
+        for cs in CardSet(cards).rank_dict().values():
             if len(cs) == 2:
                 pair = Pair(*cs)
             elif len(cs) == 3:

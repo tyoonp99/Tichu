@@ -3,6 +3,17 @@ Implementation of the Tichu game and agents able to play it.
 
 -------------------------
 
+## Run core regression tests with Docker
+
+Docker Desktop must be running. Build the test image and run the tests with:
+
+```bash
+docker compose build
+docker compose run --rm tests
+```
+
+The core test image contains only the dependencies required for the card and game-state model. It does not include the legacy neural-network training stack.
+
 ## Dependencies
 **Python 3.6+**
 

@@ -1,0 +1,15 @@
+.git
+.idea
+.venv
+__pycache__
+*.py[cod]
+*.log
+.pytest_cache
+.coverage
+htmlcov
+nn_training/logs
+experiments/logs
+scraper/*.csv
+scraper/*.ipynb
+**/*.h5f
+**/*.pkl

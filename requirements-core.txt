@@ -1,0 +1,4 @@
+gym==0.26.2
+numpy==1.26.4
+profilehooks==1.13.0
+pytest==8.3.5

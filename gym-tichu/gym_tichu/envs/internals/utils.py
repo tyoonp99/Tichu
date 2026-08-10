@@ -1,6 +1,6 @@
 import abc
 from collections import abc as collectionsabc
-from decorator import contextmanager
+from contextlib import contextmanager
 from time import time
 from datetime import timedelta
 import os
