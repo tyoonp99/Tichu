@@ -9,8 +9,13 @@
 - `fuegi-vs-random-20.csv`: Fuegi 대 Random
 - `fuegi-vs-balanced-20.csv`: Fuegi 대 BalancedRandom
 - `fuegi-vs-mcts-20.csv`: Fuegi 대 MCTS
-- `fuegi-mcts-guided-vs-fuegi-20.csv`: Fuegi-guided MCTS 대 Fuegi
-- `fuegi-mcts-guided-vs-mcts-10.csv`: Fuegi-guided MCTS 대 MCTS
+- `fuegi-mcts-guided-vs-fuegi-20.csv`: Fuegi-guided MCTS 대 Fuegi 초기 측정
+- `fuegi-mcts-guided-vs-mcts-10.csv`: Fuegi-guided MCTS 대 MCTS 초기 측정
+- `fuegi-mcts-guided-vs-fuegi-100.csv`: Fuegi-guided MCTS 대 Fuegi 확대 검증
+- `fuegi-mcts-guided-vs-mcts-100.csv`: Fuegi-guided MCTS 대 MCTS 확대 검증
+
+확대 검증은 `seed=30000`, `target=100`, `iterations=10`, `max-time=0.2`로
+실행했으며, 각 파일은 좌석 교환을 포함한 200경기를 담고 있습니다.
 
 파일명의 마지막 숫자는 실험에 사용한 기본 시드 수입니다. 각 시드는 좌석 효과를 줄이기 위해
 팀 위치를 바꾼 경기까지 포함할 수 있으므로 CSV 행 수는 시드 수보다 많을 수 있습니다.
