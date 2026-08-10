@@ -14,7 +14,7 @@ from operator import itemgetter
 from typing import Optional, Union, Hashable, NewType, TypeVar, Tuple, List, Dict, Iterable, Generator, Set, FrozenSet
 from math import sqrt, log
 from time import time
-from scraper.tichumania_game_scraper import GenCombWeights  # TODO not nice, make better
+from .combination_weights import CombinationWeights
 
 from profilehooks import timecall, profile
 
@@ -299,7 +299,7 @@ class Ismcts(object):
 
     def _record_for_state(self, state: TichuState)->UCB1Record:
         nid = self.graph_node_id(state)
-        return self.graph.node[nid]['record']
+        return self.graph.nodes[nid]['record']
 
     def add_child_node(self, from_nid: Optional[NodeID] = None, to_nid: Optional[NodeID] = None, action: Optional[PlayerAction] = None) -> None:
         """
@@ -315,7 +315,7 @@ class Ismcts(object):
         """
 
         def add_node(nid: NodeID):
-            self.graph.add_node(nid, attr_dict={'record': UCB1Record()})
+            self.graph.add_node(nid, record=UCB1Record())
 
         if from_nid is not None and from_nid not in self.graph:
             add_node(from_nid)
@@ -324,7 +324,7 @@ class Ismcts(object):
             add_node(to_nid)
 
         if action is not None and from_nid is not None and to_nid is not None:  # if all 3 are not none
-            self.graph.add_edge(u=from_nid, v=to_nid, attr_dict={'action': action})
+            self.graph.add_edge(from_nid, to_nid, action=action)
 
     def add_root(self, state: TichuState) -> None:
         """
@@ -355,7 +355,7 @@ class Ismcts(object):
         """
 
     def is_fully_expanded(self, state: TichuState) -> bool:
-        existing_actions = {action for _, _, action in self.graph.out_edges_iter(nbunch=[self.graph_node_id(state)], data='action', default=None)}
+        existing_actions = {action for _, _, action in self.graph.out_edges(nbunch=[self.graph_node_id(state)], data='action', default=None)}
         if len(existing_actions) < len(state.possible_actions_set):
             # some acitions are definitively missing
             return False
@@ -402,9 +402,9 @@ class Ismcts(object):
 
         max_a = next(iter(possactions))
         max_v = -float('inf')
-        for _, to_nid, action in self.graph.out_edges_iter(nid, data='action', default=None):
+        for _, to_nid, action in self.graph.out_edges(nid, data='action', default=None):
             if action in possactions:
-                rec = self.graph.node[to_nid]['record']
+                rec = self.graph.nodes[to_nid]['record']
                 val = self.action_val(state=state, action=action, record=rec)
                 logger.debug(f"   {val}->{action}: {rec}")
                 if val > max_v:
@@ -477,10 +477,10 @@ class UCBTreePolicy(TreePolicy, metaclass=abc.ABCMeta):
         poss_actions = state.possible_actions_set
         max_val = -float('inf')
         max_actions = list()
-        for _, to_nid, action in self.graph.out_edges_iter(nbunch=[nid], data='action', default=None):
+        for _, to_nid, action in self.graph.out_edges(nbunch=[nid], data='action', default=None):
             # logger.debug("Tree selection looking at "+str(action))
             if action in poss_actions:
-                child_record = self.graph.node[to_nid]['record']
+                child_record = self.graph.nodes[to_nid]['record']
                 self._available_records.add(child_record)
                 val = child_record.ucb(p=state.player_pos)
                 if max_val == val:
@@ -527,10 +527,10 @@ class MoveGroupsTreeSelectionPolicy(UCBTreePolicy, metaclass=abc.ABCMeta):
         # create movegroups (group same combination type)
         poss_actions = state.possible_actions_set
         move_groups = defaultdict(list)
-        for _, to_nid, action in self.graph.out_edges_iter(nbunch=[nid], data='action', default=None):
+        for _, to_nid, action in self.graph.out_edges(nbunch=[nid], data='action', default=None):
             # logger.debug("Tree selection looking at "+str(action))
             if action in poss_actions:
-                child_record = self.graph.node[to_nid]['record']
+                child_record = self.graph.nodes[to_nid]['record']
                 self._available_records.add(child_record)
                 val = child_record.ucb(p=state.player_pos)
                 try:
@@ -1395,7 +1395,9 @@ DefaultIsmcts = make_default_ismctsearch(name='DefaultIsmcts', ret_class=True)
 
 
 # Probability that given some handcards of the length, the GeneralCombination is in it.
-WEIGHTS_DICT: Dict[Tuple[Length, GeneralCombination], float] = GenCombWeights.weights_from_file("{}/gcombweights.pkl".format(os.path.dirname(os.path.realpath(__file__))))
+WEIGHTS_DICT: Dict[Tuple[Length, GeneralCombination], float] = CombinationWeights.weights_from_file(
+    "{}/gcombweights.pkl".format(os.path.dirname(os.path.realpath(__file__)))
+)
 
 
 class Determiner(object):
