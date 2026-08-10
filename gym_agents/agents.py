@@ -1,27 +1,59 @@
 
 import datetime
+import logging
+import os
+import random
+from collections import OrderedDict, defaultdict
 from math import ceil
 
-import rl
 from profilehooks import timecall
-from rl.callbacks import ModelIntervalCheckpoint, FileLogger
 
 import logginginit
 from typing import Union, Optional, List, Set, Tuple, Collection, Any, Iterable, Dict
-from collections import OrderedDict
 
-from gym_tichu.envs.internals import (wishable_card_ranks, CardTrade)
+from gym_tichu.envs.internals import (
+    Card,
+    CardRank,
+    CardTrade,
+    HandCards,
+    PassAction,
+    PlayCombination,
+    PlayerAction,
+    TichuState,
+    wishable_card_ranks,
+)
 from gym_tichu.envs.internals.utils import check_param, make_sure_path_exists
-from rl.core import Processor, Env
-from rl.policy import BoltzmannQPolicy, LinearAnnealedPolicy
-
-from .keras_rl_utils import (make_dqn_rl_agent, make_sarsa_rl_agent, Processor_56x5, Processor_56x5_2_seperate,
-                             Processor_17x5_2, Processor_17x5_2_seperate)
-
-
-from .minimax import *
-from .mcts import *
 from . import strategies
+
+try:
+    import rl
+    from rl.callbacks import ModelIntervalCheckpoint, FileLogger
+    from rl.policy import BoltzmannQPolicy, LinearAnnealedPolicy
+
+    from .keras_rl_utils import (
+        make_dqn_rl_agent,
+        make_sarsa_rl_agent,
+        Processor_56x5,
+        Processor_56x5_2_seperate,
+        Processor_17x5_2,
+        Processor_17x5_2_seperate,
+    )
+    _RL_IMPORT_ERROR = None
+except ImportError as error:
+    rl = None
+    _RL_IMPORT_ERROR = error
+
+    def _missing_rl_dependency(*args, **kwargs):
+        raise ImportError(
+            "The legacy DQN agents require keras-rl and Keras dependencies."
+        ) from _RL_IMPORT_ERROR
+
+    make_dqn_rl_agent = _missing_rl_dependency
+    make_sarsa_rl_agent = _missing_rl_dependency
+    Processor_56x5 = _missing_rl_dependency
+    Processor_56x5_2_seperate = _missing_rl_dependency
+    Processor_17x5_2 = _missing_rl_dependency
+    Processor_17x5_2_seperate = _missing_rl_dependency
 
 logger = logging.getLogger(__name__)
 human_logger = logginginit.CONSOLE_LOGGER
@@ -50,8 +82,8 @@ class DefaultGymAgent(object):
         return "{me.__class__.__name__}, Takes always the first action".format(me=self)
 
     def action(self, state):
-        logger.debug("BaseAgent chooses from actions: {}".format([str(a) for a in state.possible_actions()]))
-        return next(state.possible_actions_list)
+        logger.debug("BaseAgent chooses from actions: {}".format([str(a) for a in state.possible_actions_list]))
+        return state.possible_actions_list[0]
 
 
 # ################## RANDOM ####################
@@ -95,6 +127,7 @@ class MinimaxAgent(DefaultGymAgent):
 
     def __init__(self, depth: int=4):
         super().__init__()
+        from .minimax import Minimax
         self._search = Minimax()
         self.depth = depth
 
@@ -119,7 +152,7 @@ class MinimaxAgent(DefaultGymAgent):
 # ################## MCTS ####################
 class BaseMonteCarloAgent(DefaultGymAgent):
 
-    def __init__(self, search_algorithm: Ismcts, iterations: int=100, max_time: float=float('inf'), cheat: Union[bool, float]=False):
+    def __init__(self, search_algorithm: Any, iterations: int=100, max_time: float=float('inf'), cheat: Union[bool, float]=False):
         super().__init__()
         assert cheat in [True, False] or 0 <= cheat <= 1
         self._search = search_algorithm
@@ -347,7 +380,7 @@ class HumanInputAgent(DefaultGymAgent):
 # ################## LEARNING / DQN ####################
 class RLAgent(BalancedRandomAgent):
 
-    def __init__(self,  agent: rl.core.Agent, weights_file: Optional[str]):
+    def __init__(self, agent: Any, weights_file: Optional[str]):
         """
         
         :param agent: 
@@ -391,7 +424,7 @@ class RLAgent(BalancedRandomAgent):
             logger.debug("Q-agent chooses action: {}".format(action))
             return action
 
-    def train(self, env: Env, base_folder: str, nbr_steps: int=1000):
+    def train(self, env: Any, base_folder: str, nbr_steps: int=1000):
         """
         Trains the agent
         :param env: The environment to train on
