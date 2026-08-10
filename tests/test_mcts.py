@@ -33,3 +33,25 @@ def test_default_mcts_returns_a_legal_action(state_factory):
     )
 
     assert action in state.possible_actions_set
+
+
+def test_mcts_always_completes_one_iteration_when_time_budget_is_exhausted(state_factory):
+    state = state_factory(
+        [
+            {Card.TWO_JADE},
+            {Card.THREE_JADE},
+            {Card.FOUR_JADE},
+            {Card.FIVE_JADE},
+        ]
+    )
+    search = make_default_ismctsearch(name="ZeroTimeBudgetMcts")
+
+    action = search.search(
+        root_state=state,
+        observer_id=state.player_pos,
+        iterations=10,
+        cheat=False,
+        max_time=0,
+    )
+
+    assert action in state.possible_actions_set

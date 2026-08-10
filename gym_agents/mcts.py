@@ -203,6 +203,9 @@ class Ismcts(object):
         """
         logger.debug(f"Started {self.__class__.__name__} with observer {observer_id}, for {iterations} iterations, max_time: {max_time} seconds and cheat={cheat}")
         check_param(observer_id in range(4))
+        check_param(iterations > 0)
+        check_param(nbr_determinizations > 0)
+        check_param(max_time >= 0)
 
         start_t = time()
         end_t = start_t + max_time
@@ -224,18 +227,24 @@ class Ismcts(object):
         if cheat is True:
             dets = [root_search_state]
         elif cheat is False:
-            dets = [self.determine(state=root_search_state, observer=self.observer_id) for _ in range(nbr_determinizations)]
+            dets = [
+                self.determine(state=root_search_state, observer=self.observer_id)
+                for _ in range(min(nbr_determinizations, iterations))
+            ]
         else:
             assert 0 < cheat < 1
-            dets = [self.determine(state=root_search_state, observer=self.observer_id, cheat=cheat) for _ in range(nbr_determinizations)]
+            dets = [
+                self.determine(state=root_search_state, observer=self.observer_id, cheat=cheat)
+                for _ in range(min(nbr_determinizations, iterations))
+            ]
 
 
         iteration = 0
-        while iteration < iterations and time() < end_t:
+        while iteration < iterations and (iteration == 0 or time() < end_t):
             iteration += 1
             self.init_iteration()
             # logger.debug("iteration "+str(iteration))
-            state_det = dets[iteration % len(dets)]  # root_search_state if cheat else self.determine(state=root_search_state, observer=self.observer_id)
+            state_det = dets[(iteration - 1) % len(dets)]  # root_search_state if cheat else self.determine(state=root_search_state, observer=self.observer_id)
             assert self.graph_node_id(state_det) == self.graph_node_id(root_search_state)  # make sure it is the same node
             # logger.debug("Tree policy")
             leaf_state = self.tree_policy(state_det)
@@ -1426,7 +1435,7 @@ class Determiner(object):
         all_cards = CardSet(self._state.handcards.iter_all_cards())
         known = CardSet(flatten(self.initial_handcards.values()))
 
-        return list(c for c in all_cards if c not in known)
+        return sorted(c for c in all_cards if c not in known)
 
     def _init_handcards(self)->Dict[int, List[Card]]:
         handcards = {ppos: list() for ppos in self._other_players}

@@ -383,7 +383,10 @@ class BaseTichuState(object, metaclass=abc.ABCMeta):
     @timecall(immediate=False)
     def possible_actions_list(self)->List[PlayerAction]:
         if self._possible_actions_list is None:
-            self._possible_actions_list = list(self.possible_actions_gen())
+            self._possible_actions_list = sorted(
+                self.possible_actions_gen(),
+                key=lambda action: (action.__class__.__name__, repr(action)),
+            )
         return self._possible_actions_list
 
     @abc.abstractmethod

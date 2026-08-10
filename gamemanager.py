@@ -36,7 +36,7 @@ class TichuGame(object):
     def agents(self):
         return self._agents
 
-    def start_game(self, target_points=1000)->Tuple[Tuple[int, int], List[Any]]:
+    def start_game(self, target_points=1000, seed=None, max_round_errors=99)->Tuple[Tuple[int, int], List[Any]]:
         """
         Starts the tichu game
         Returns a tuple containing the points the two teams made
@@ -47,37 +47,38 @@ class TichuGame(object):
 
             round_histories = list()
             nbr_errors = 0
-            nbr_errors_to_ignore = 99
+            if max_round_errors < 0:
+                raise ValueError("max_round_errors must be at least 0")
 
             points = (0, 0)
 
             while points[0] < target_points and points[1] < target_points:
                 # run rounds until there is a winner
                 try:
-                    round_points, round_history = self._start_round()
+                    round_seed = None if seed is None else seed + len(round_histories)
+                    round_points, round_history = self._start_round(seed=round_seed)
                     round_histories.append(round_history)
                     points = (round_points[0] + points[0], round_points[1] + points[1])
                     console_logger.warning("=========================================")
                     console_logger.warning("Intermediate Result: {}".format(points))
                     console_logger.warning("=========================================")
                 except Exception as err:
-                    # log the 10 first errors, but continue with next round.
                     nbr_errors += 1
-                    if nbr_errors > nbr_errors_to_ignore:
+                    if nbr_errors > max_round_errors:
                         raise
                     else:
-                        logger.error("There was en error while running a round. Next {} errors will be ignored.".format(nbr_errors_to_ignore-nbr_errors))
+                        logger.error("There was an error while running a round. Next {} errors will be ignored.".format(max_round_errors-nbr_errors))
                         logger.exception(err)
 
             console_logger.info("[GAME END] Game ended: {p} [Nbr_Errors: {nbr_errs}, Time: {time_passed}]".format(p=points, nbr_errs=nbr_errors, time_passed=time_since(since=start_t)))
 
         return GameOutcome(points, round_histories)
 
-    def _start_round(self)->Tuple[Tuple[int, int], Any]:
+    def _start_round(self, seed=None)->Tuple[Tuple[int, int], Any]:
         start_t = time()
         console_logger.info("[ROUND START] Start round...")
 
-        curr_state, reward, done, info = self._setup_round()
+        curr_state, reward, done, info = self._setup_round(seed=seed)
         assert reward == (0, 0, 0, 0)
         assert done is False
         logger.debug("Set up state: {}".format(curr_state))
@@ -149,12 +150,12 @@ class TichuGame(object):
         console_logger.warning("[ROUND END] Round ended: ranking: {}, outcome: {} [Time: {}]".format(curr_state.ranking, points, time_since(since=start_t)))
         return GameOutcome(points, curr_state.history)
 
-    def _setup_round(self)->Tuple[TichuState, Tuple[int, int, int, int], bool, dict]:
+    def _setup_round(self, seed=None)->Tuple[TichuState, Tuple[int, int, int, int], bool, dict]:
         """
         Sets up the round until the first player can play a combinaiton
         :return: a 4-tuple(state, reward_vector, done, info_dict)
         """
-        s_8cards, _ = self.env.reset()
+        s_8cards, _ = self.env.reset(seed=seed)
         # grand tichu
         announced_gt = set()
         for ppos, agent in enumerate(self._agents):

@@ -48,3 +48,18 @@ def test_random_agents_finish_a_game_to_target_score(agent_type):
     assert all(history.last_state().is_terminal() for history in histories)
 
     game.env.close()
+
+
+def test_game_can_fail_fast_instead_of_ignoring_round_errors(monkeypatch):
+    agents = [RandomAgent() for _ in range(4)]
+    game = TichuGame(*agents)
+
+    def fail_round(seed=None):
+        raise RuntimeError("round failed")
+
+    monkeypatch.setattr(game, "_start_round", fail_round)
+    try:
+        with pytest.raises(RuntimeError, match="round failed"):
+            game.start_game(target_points=100, max_round_errors=0)
+    finally:
+        game.env.close()

@@ -14,6 +14,25 @@ docker compose run --rm tests
 
 The core test image contains only the dependencies required for the card and game-state model. It does not include the legacy neural-network training stack.
 
+## Run reproducible agent benchmarks
+
+The benchmark runner plays every seed twice and swaps the teams between the
+even and odd seats. Per-game results are written to CSV.
+
+```bash
+docker compose run --rm tests python benchmark.py \
+  --team-a mcts \
+  --team-b balanced-random \
+  --games 10 \
+  --seed 42 \
+  --target 100 \
+  --iterations 10 \
+  --max-time 0.2
+```
+
+`--games 10` means 10 seeded deals and 20 games after the seat-swapped
+rematches. See [milestone.md](./milestone.md) for the AI development roadmap.
+
 ## Dependencies
 **Python 3.6+**
 

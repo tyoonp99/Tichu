@@ -441,7 +441,7 @@ class CardSet(TypedFrozenSet):
         :param n: int > 0
         :return: n random cards.
         """
-        cds = list(self)
+        cds = sorted(self)
         rnd.shuffle(cds)
         return cds[:n]
 
