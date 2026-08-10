@@ -462,7 +462,11 @@ class CardSet(TypedFrozenSet):
         param_tup = (played_on, contains_rank)
         if param_tup not in self._poss_combs_cache:
             # logger.debug("Not cached")
-            self._poss_combs_cache[param_tup] = list(self._possible_combinations_gen(played_on=played_on, contains_rank=contains_rank))
+            generated = self._possible_combinations_gen(
+                played_on=played_on,
+                contains_rank=contains_rank,
+            )
+            self._poss_combs_cache[param_tup] = list(dict.fromkeys(generated))
         # logger.debug("yield from : {}".format(self._poss_combs_cache[param_tup]))
         yield from self._poss_combs_cache[param_tup]
 
