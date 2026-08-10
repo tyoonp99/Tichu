@@ -50,6 +50,7 @@ pip-delete-this-directory.txt
 htmlcov/
 benchmark-results*.csv
 logs/
+datasets/
 .tox/
 .coverage
 .coverage.*

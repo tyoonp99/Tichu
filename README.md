@@ -35,6 +35,26 @@ rematches. See [milestone.md](./milestone.md) for the AI development roadmap.
 Available benchmark agents are `random`, `balanced-random`, `fuegi`, `mcts`,
 and `fuegi-mcts`.
 
+## Collect teacher decisions for learning
+
+The dataset collector records only information visible to the acting player,
+the legal actions, the teacher's choice, MCTS root statistics, and the final
+team result. Paired games from the same seed are always assigned to the same
+train or validation split.
+
+```bash
+docker compose run --rm tests python collect_dataset.py \
+  --team-a fuegi-mcts \
+  --team-b fuegi \
+  --record-agent fuegi-mcts \
+  --games 100 \
+  --seed 40000 \
+  --output-dir datasets/tichu-decisions-v1
+```
+
+See [docs/training-dataset-v1.md](./docs/training-dataset-v1.md) for the schema
+and privacy rules. Generated datasets are intentionally ignored by Git.
+
 ## Dependencies
 **Python 3.6+**
 
