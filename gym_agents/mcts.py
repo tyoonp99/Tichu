@@ -9,6 +9,7 @@ import random
 import atexit
 
 from collections import defaultdict
+from collections import namedtuple
 from functools import lru_cache
 from operator import itemgetter
 from typing import Optional, Union, Hashable, NewType, TypeVar, Tuple, List, Dict, Iterable, Generator, Set, FrozenSet
@@ -28,6 +29,16 @@ logger = logging.getLogger(__name__)
 
 NodeID = NewType('NodeID', Hashable)
 RewardVector = NewType('RewardVector', Tuple[int, int, int, int])
+SearchMetrics = namedtuple(
+    "SearchMetrics",
+    [
+        "requested_iterations",
+        "completed_iterations",
+        "elapsed_seconds",
+        "reached_iteration_limit",
+        "reached_time_limit",
+    ],
+)
 
 
 @lru_cache(maxsize=2**14)  # After 1 round: CacheInfo(hits=165945, misses=2534, maxsize=32768, currsize=2534)
@@ -183,6 +194,7 @@ class Ismcts(object):
         self.observer_id = None
         self._visited_records = set()
         self._available_records = set()
+        self.last_search_metrics = None
 
     @property
     def info(self)->str:
@@ -254,6 +266,15 @@ class Ismcts(object):
             # logger.debug("backpropagation")
             assert len(rollout_result) == 4
             self.backpropagation(reward_vector=rollout_result)
+
+        search_elapsed = time() - start_t
+        self.last_search_metrics = SearchMetrics(
+            requested_iterations=iterations,
+            completed_iterations=iteration,
+            elapsed_seconds=search_elapsed,
+            reached_iteration_limit=iteration >= iterations,
+            reached_time_limit=iteration < iterations and search_elapsed >= max_time,
+        )
 
         action = self.best_action(root_state)
         logger.debug(f"size of graph after search: {len(self.graph)}")

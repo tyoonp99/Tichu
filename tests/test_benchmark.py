@@ -1,4 +1,4 @@
-from benchmark import build_parser, make_agent, summarize
+from benchmark import build_parser, make_agent, play_game, run_benchmark, summarize
 from gym_agents import FuegiHeuristicAgent, FuegiMctsAgent
 
 
@@ -20,6 +20,8 @@ def test_benchmark_parser_configures_paired_matches():
     assert args.team_b == "random"
     assert args.games == 3
     assert args.seed == 42
+    assert args.bc_checkpoint == "models/behavior-cloning-v1.pt"
+    assert args.bc_device == "cpu"
 
 
 def test_benchmark_can_create_fuegi_agent():
@@ -46,6 +48,91 @@ def test_benchmark_summary_uses_team_a_perspective():
         "draws": 1,
         "average_point_diff": 25 / 3,
         "elapsed_seconds": 3.0,
+    }
+
+
+def test_benchmark_summary_reports_actual_mcts_work():
+    results = [
+        {
+            "winner": "A",
+            "point_diff": 50,
+            "elapsed_seconds": 1.0,
+            "mcts_search_calls": 2,
+            "mcts_iterations_requested": 20,
+            "mcts_iterations_completed": 15,
+            "mcts_time_limit_hits": 1,
+            "mcts_iteration_limit_hits": 1,
+        },
+        {
+            "winner": "B",
+            "point_diff": -10,
+            "elapsed_seconds": 2.0,
+            "mcts_search_calls": 1,
+            "mcts_iterations_requested": 10,
+            "mcts_iterations_completed": 10,
+            "mcts_time_limit_hits": 0,
+            "mcts_iteration_limit_hits": 1,
+        },
+    ]
+
+    summary = summarize(results)
+
+    assert summary["mcts_search_calls"] == 3
+    assert summary["mcts_average_requested_iterations"] == 10
+    assert summary["mcts_average_iterations"] == 8.333333
+    assert summary["mcts_time_limit_hits"] == 1
+    assert summary["mcts_iteration_limit_hits"] == 2
+
+
+def test_command_line_benchmark_progress_is_visible(monkeypatch, capsys):
+    def fake_play_game(team_a, team_b, **kwargs):
+        return {
+            "winner": "A",
+            "point_diff": 100,
+            "elapsed_seconds": 0.01,
+        }
+
+    monkeypatch.setattr("benchmark.play_game", fake_play_game)
+
+    results = run_benchmark(
+        "behavior-cloning",
+        "fuegi",
+        games=2,
+        seed=42,
+        target_points=100,
+        show_progress=True,
+    )
+
+    output = capsys.readouterr().out
+    assert len(results) == 4
+    assert "Progress: 4/4 (100.0%)" in output
+
+
+def test_fixed_iteration_benchmark_is_reproducible():
+    arguments = {
+        "seed": 4321,
+        "target_points": 100,
+        "iterations": 2,
+        "max_time": float("inf"),
+    }
+
+    first = play_game("mcts", "fuegi", **arguments)
+    second = play_game("mcts", "fuegi", **arguments)
+    stable_fields = (
+        "team_a_points",
+        "team_b_points",
+        "point_diff",
+        "winner",
+        "rounds",
+        "mcts_search_calls",
+        "mcts_iterations_completed",
+        "mcts_average_iterations",
+        "mcts_time_limit_hits",
+        "mcts_iteration_limit_hits",
+    )
+
+    assert {field: first[field] for field in stable_fields} == {
+        field: second[field] for field in stable_fields
     }
 
 

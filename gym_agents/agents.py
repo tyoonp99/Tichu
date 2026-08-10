@@ -159,6 +159,7 @@ class BaseMonteCarloAgent(DefaultGymAgent):
         self.iterations = iterations
         self.cheat = cheat
         self.max_time = max_time
+        self.search_metrics = []
 
     @property
     def info(self):
@@ -170,11 +171,14 @@ class BaseMonteCarloAgent(DefaultGymAgent):
             logger.debug("There is only one possible action: {}".format(act))
             return act
         else:
-            return self._search.search(root_state=state,
-                                       observer_id=state.player_pos,
-                                       iterations=self.iterations,
-                                       max_time=self.max_time,
-                                       cheat=self.cheat)
+            action = self._search.search(root_state=state,
+                                         observer_id=state.player_pos,
+                                         iterations=self.iterations,
+                                         max_time=self.max_time,
+                                         cheat=self.cheat)
+            if self._search.last_search_metrics is not None:
+                self.search_metrics.append(self._search.last_search_metrics)
+            return action
 
     def __str__(self):
         return "{me.__class__.__name__}({me._search.__class__.__name__}, {me.iterations}, {me.cheat})".format(me=self)

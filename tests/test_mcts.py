@@ -34,6 +34,9 @@ def test_default_mcts_returns_a_legal_action(state_factory):
     )
 
     assert action in state.possible_actions_set
+    assert search.last_search_metrics.completed_iterations == 2
+    assert search.last_search_metrics.reached_iteration_limit
+    assert not search.last_search_metrics.reached_time_limit
 
 
 def test_mcts_always_completes_one_iteration_when_time_budget_is_exhausted(state_factory):
@@ -56,6 +59,9 @@ def test_mcts_always_completes_one_iteration_when_time_budget_is_exhausted(state
     )
 
     assert action in state.possible_actions_set
+    assert search.last_search_metrics.completed_iterations == 1
+    assert not search.last_search_metrics.reached_iteration_limit
+    assert search.last_search_metrics.reached_time_limit
 
 
 def test_fuegi_mcts_evaluates_the_final_team_point_difference(state_factory):
