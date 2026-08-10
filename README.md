@@ -55,6 +55,10 @@ docker compose run --rm tests python collect_dataset.py \
 See [docs/training-dataset-v1.md](./docs/training-dataset-v1.md) for the schema
 and privacy rules. Generated datasets are intentionally ignored by Git.
 
+The verified Brettspielwelt decisions can also train a supervised legal-action
+ranking baseline. See [docs/behavior-cloning.md](./docs/behavior-cloning.md) for
+the Docker smoke test, full training command, and validation metrics.
+
 ## Dependencies
 **Python 3.6+**
 

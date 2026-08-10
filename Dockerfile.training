@@ -1,0 +1,15 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/gym-tichu:/app
+
+COPY requirements-core.txt requirements-training.txt ./
+RUN pip install --no-cache-dir -r requirements-training.txt
+
+COPY . .
+
+ENTRYPOINT ["python", "nn_training/train_behavior_cloning.py"]
+CMD ["--help"]

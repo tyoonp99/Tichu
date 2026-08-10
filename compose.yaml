@@ -6,4 +6,22 @@ services:
     working_dir: /app
     volumes:
       - .:/app
+    environment:
+      PYTHONHASHSEED: "0"
     command: pytest -q
+  train-bc:
+    build:
+      context: .
+      dockerfile: Dockerfile.training
+    working_dir: /app
+    volumes:
+      - .:/app
+    environment:
+      PYTHONHASHSEED: "0"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

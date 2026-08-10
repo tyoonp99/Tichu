@@ -51,6 +51,7 @@ htmlcov/
 benchmark-results*.csv
 logs/
 datasets/
+models/
 .tox/
 .coverage
 .coverage.*
