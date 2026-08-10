@@ -412,12 +412,13 @@ class TichuSinglePlayerTrainEnv(Env, metaclass=abc.ABCMeta):
         self.processor = processor
 
     def reset(self):
-        state = self.game._reset()
+        state, _ = self.game.reset()
         return self.processor.encode_tichu_state(state)
 
     def step(self, action):
         playeraction = self.processor.decode_action(action)
-        state, r, done, info = self.game._step(playeraction)
+        state, r, terminated, truncated, info = self.game.step(playeraction)
+        done = terminated or truncated
         return self.processor.encode_tichu_state(state), r, done, info
 
     def render(self, mode='human', close=False):

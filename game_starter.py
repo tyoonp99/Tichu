@@ -1,7 +1,5 @@
 
 import datetime
-import gym
-
 # this_folder = '/'.join(os.getcwd().split('/')[:])
 # parent_folder = '/'.join(os.getcwd().split('/')[:-1])
 #
@@ -96,8 +94,6 @@ def minimax_against_mcts(target_points: int):
     return res
 
 if __name__ == "__main__":
-    gym.undo_logger_setup()
-
     start_ftime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     this_folder = '/'.join(os.getcwd().split('/')[:])

@@ -1,4 +1,4 @@
-To register the environment: 
+To install and register the Gymnasium environment:
 
 ```bash
 cd gym-tichu

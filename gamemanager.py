@@ -4,7 +4,7 @@ import logging
 from typing import Tuple, List, Any
 import datetime
 
-import gym
+import gymnasium as gym
 
 import gym_tichu  # needed to register the environment
 import itertools
@@ -13,7 +13,6 @@ from gym_tichu.envs.internals.utils import error_logged, time_since
 from profilehooks import timecall
 
 import logginginit
-from gym_agents.agents import HumanInputAgent
 
 logger = logging.getLogger(__name__)
 console_logger = logginginit.CONSOLE_LOGGER
@@ -135,7 +134,8 @@ class TichuGame(object):
                 console_logger.debug("[Time: {}]".format(time_since(since=loop_start_t)))
 
             # APPLY THE ACTION
-            curr_state, reward, done, info = self.env.step(chosen_action)
+            curr_state, reward, terminated, truncated, info = self.env.step(chosen_action)
+            done = terminated or truncated
             if len(curr_state.handcards[current_player]) == 0:
                 console_logger.info("[FINISH] player {} just finished. -> new ranking: {}".format(current_player, curr_state.ranking))
 
@@ -154,7 +154,7 @@ class TichuGame(object):
         Sets up the round until the first player can play a combinaiton
         :return: a 4-tuple(state, reward_vector, done, info_dict)
         """
-        s_8cards = self.env.reset()
+        s_8cards, _ = self.env.reset()
         # grand tichu
         announced_gt = set()
         for ppos, agent in enumerate(self._agents):
@@ -163,7 +163,8 @@ class TichuGame(object):
         console_logger.info("[GRAND TICHUS]: {}".format(announced_gt))
         console_logger.debug("handcards: {}".format(s_8cards.handcards))
 
-        s_14cards, _, _, _ = self.env.step(announced_gt)
+        s_14cards, _, terminated, truncated, _ = self.env.step(announced_gt)
+        assert not terminated and not truncated
 
         # players may announce (normal) tichu now
         announced_t = set()
@@ -173,7 +174,8 @@ class TichuGame(object):
         console_logger.info("[TICHUS]: {}".format(announced_t))
         console_logger.debug("handcards: {}".format(s_14cards.handcards))
 
-        s_before_trading, _, _, _ = self.env.step(announced_t)
+        s_before_trading, _, terminated, truncated, _ = self.env.step(announced_t)
+        assert not terminated and not truncated
 
         # trade cards
         traded_cards = list()
@@ -189,7 +191,8 @@ class TichuGame(object):
 
         # Notify the human players about the cards they received  # TODO this is a hack
         for pos, agent in enumerate(self._agents):
-            if isinstance(agent, HumanInputAgent):
+            if hasattr(agent, 'traded_cards_received'):
                 agent.traded_cards_received(filter(lambda tc: tc.to == pos, traded_cards))
 
-        return self.env.step(traded_cards)
+        state, reward, terminated, truncated, info = self.env.step(traded_cards)
+        return state, reward, terminated or truncated, info

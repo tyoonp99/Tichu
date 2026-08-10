@@ -5,7 +5,6 @@ import sys
 import time
 import datetime
 
-import gym
 import logging
 
 
@@ -30,7 +29,6 @@ logger = logging.getLogger(__name__)
 
 
 if __name__ == '__main__':
-    gym.undo_logger_setup()
     poss_envs = {'random': lambda agent: (BalancedRandomAgent(), agent, BalancedRandomAgent()),
                  'learned': lambda agent: (DQNAgent2L_56x5(), agent, DQNAgent2L_56x5()),
                  'learning': lambda agent: (agent, agent, agent),

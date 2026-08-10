@@ -3,7 +3,6 @@ Starts a game against the computer
 """
 import argparse
 import datetime
-import gym
 import sys
 import os
 
@@ -81,8 +80,6 @@ if __name__ == "__main__":
                         help='When this flag is present, then you can see the handcards of the other players.')
 
     args = parser.parse_args()
-
-    gym.undo_logger_setup()
 
     start_ftime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 

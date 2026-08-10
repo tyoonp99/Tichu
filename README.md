@@ -24,14 +24,14 @@ And following packages (all should be installable with pip or anaconda).
 - **keras**: https://keras.io/.
 - either **Tensorflow** or **Theano** (used by keras)
 - **h5py**: For the h5f files.
-- **gym**: OpenAI-gym (https://github.com/openai/gym#pip-version)
+- **gymnasium**: Maintained successor to OpenAI Gym (https://gymnasium.farama.org/)
 - **networkx**: For the Game-graph
 - **numpy**
 - **argparse**: To parse command line inputs
 - **requests**: For the [tichumania](http://log.tichumania.de) scraper
 - **BeautifulSoup**: For the [tichumania](http://log.tichumania.de) scraper
 
-Then do (to register the gym-environment):
+Then do (to install and register the Gymnasium environment):
 ```bash
 cd gym-tichu
 pip install -e .

@@ -9,7 +9,6 @@ from multiprocessing import Pool, Lock
 import sys, os
 from typing import Tuple
 
-import gym
 
 
 this_folder = '/'.join(os.getcwd().split('/')[:])
@@ -447,7 +446,6 @@ if __name__ == "__main__":
     log_folder_name = "./logs/" + args.experiment_name + "_" + start_ftime
 
     logmode = logginginit.logging_modes[args.log_mode]
-    gym.undo_logger_setup()
     min_loglevel = logging.DEBUG
     if args.ignore_debug:
         min_loglevel = logging.INFO
