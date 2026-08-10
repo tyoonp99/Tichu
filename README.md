@@ -32,6 +32,8 @@ docker compose run --rm tests python benchmark.py \
 
 `--games 10` means 10 seeded deals and 20 games after the seat-swapped
 rematches. See [milestone.md](./milestone.md) for the AI development roadmap.
+Available benchmark agents are `random`, `balanced-random`, `fuegi`, and
+`mcts`.
 
 ## Dependencies
 **Python 3.6+**

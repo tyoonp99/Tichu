@@ -7,11 +7,16 @@ from statistics import mean
 from time import perf_counter
 
 from gamemanager import TichuGame
-from gym_agents import BalancedRandomAgent, BaseMonteCarloAgent, RandomAgent
+from gym_agents import (
+    BalancedRandomAgent,
+    BaseMonteCarloAgent,
+    FuegiHeuristicAgent,
+    RandomAgent,
+)
 from gym_agents.mcts import make_default_ismctsearch
 
 
-AGENT_NAMES = ("random", "balanced-random", "mcts")
+AGENT_NAMES = ("random", "balanced-random", "fuegi", "mcts")
 
 
 def make_agent(name, *, iterations=10, max_time=0.2):
@@ -19,6 +24,8 @@ def make_agent(name, *, iterations=10, max_time=0.2):
         return RandomAgent()
     if name == "balanced-random":
         return BalancedRandomAgent()
+    if name == "fuegi":
+        return FuegiHeuristicAgent()
     if name == "mcts":
         search = make_default_ismctsearch(name="BenchmarkMcts")
         return BaseMonteCarloAgent(

@@ -1,4 +1,5 @@
-from benchmark import build_parser, summarize
+from benchmark import build_parser, make_agent, summarize
+from gym_agents import FuegiHeuristicAgent
 
 
 def test_benchmark_parser_configures_paired_matches():
@@ -19,6 +20,10 @@ def test_benchmark_parser_configures_paired_matches():
     assert args.team_b == "random"
     assert args.games == 3
     assert args.seed == 42
+
+
+def test_benchmark_can_create_fuegi_agent():
+    assert isinstance(make_agent("fuegi"), FuegiHeuristicAgent)
 
 
 def test_benchmark_summary_uses_team_a_perspective():
