@@ -5,6 +5,8 @@ import pytest
 
 from scraper.download_brettspielwelt import (
     classify_log,
+    collect_latest,
+    discover_latest_id,
     download_game,
     game_ids,
 )
@@ -72,3 +74,79 @@ def test_download_game_reports_http_error_after_retries(tmp_path):
 
     assert result["status"] == "http_500"
     assert len(calls) == 2
+
+
+def test_discover_latest_id_searches_above_known_valid_hint():
+    calls = []
+
+    def fetch(url, *, timeout):
+        game_id = int(url.rsplit("/", 1)[-1].removesuffix(".tch"))
+        calls.append(game_id)
+        if game_id <= 12:
+            return COMPLETE_LOG.encode()
+        raise HTTPError(url, 500, "not found", {}, BytesIO())
+
+    latest = discover_latest_id(
+        hint=8,
+        initial_step=2,
+        retries=0,
+        fetch=fetch,
+    )
+
+    assert latest == 12
+    assert 8 in calls
+    assert 13 in calls
+
+
+def test_collect_latest_counts_existing_files_and_downloads_newest_first(tmp_path):
+    (tmp_path / "8.tch").write_text(COMPLETE_LOG, encoding="utf-8")
+    calls = []
+
+    def fetch(url, *, timeout):
+        game_id = int(url.rsplit("/", 1)[-1].removesuffix(".tch"))
+        calls.append(game_id)
+        return COMPLETE_LOG.encode()
+
+    summary = collect_latest(
+        latest_id=10,
+        target_total=3,
+        output_dir=tmp_path,
+        delay=0,
+        progress_every=1,
+        fetch=fetch,
+    )
+
+    assert calls == [10, 9]
+    assert summary["initial_complete"] == 1
+    assert summary["new_complete"] == 2
+    assert summary["complete"] == 3
+    assert summary["reached_target"]
+    assert {path.name for path in tmp_path.glob("*.tch")} == {
+        "8.tch",
+        "9.tch",
+        "10.tch",
+    }
+
+
+def test_collect_latest_continues_past_invalid_ids(tmp_path):
+    calls = []
+
+    def fetch(url, *, timeout):
+        game_id = int(url.rsplit("/", 1)[-1].removesuffix(".tch"))
+        calls.append(game_id)
+        if game_id == 9:
+            return b"not a tichu log"
+        return COMPLETE_LOG.encode()
+
+    summary = collect_latest(
+        latest_id=10,
+        target_total=2,
+        output_dir=tmp_path,
+        delay=0,
+        progress_every=10,
+        fetch=fetch,
+    )
+
+    assert calls == [10, 9, 8]
+    assert summary["complete"] == 2
+    assert summary["counts"] == {"complete": 2, "invalid": 1}

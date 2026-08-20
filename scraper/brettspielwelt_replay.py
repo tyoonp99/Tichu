@@ -2,14 +2,18 @@
 
 import argparse
 import json
+import sys
 from collections import Counter
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from gym_tichu.envs.internals.cards import Card, CardRank, Combination, Straight
+from gym_tichu.envs.internals.cards import Card, CardRank, Combination, FullHouse, Straight
 from gym_tichu.envs.internals.actions import (
     GiveDragonAwayAction,
     PassAction,
+    PassBombAction,
+    PlayBomb,
     PlayCombination,
     Trick,
     WinTrickAction,
@@ -65,6 +69,7 @@ class ReplayResult:
     detail: str | None = None
     expected_scores: tuple[int, int] | None = None
     actual_scores: tuple[int, int] | None = None
+    final_state: object | None = None
 
 
 def card_from_token(token):
@@ -105,20 +110,42 @@ def _action_kind(actions):
         return "dragon"
     if all(isinstance(action, WinTrickAction) for action in actions):
         return "win_trick"
+    if any(isinstance(action, PassBombAction) for action in actions):
+        return "bomb"
     return "play"
 
 
-def _prepare_for_event(state, event_kind):
+def _prepare_for_event(state, event=None):
     """Apply engine-only administrative actions omitted from text logs."""
+    event_kind = event.kind if event is not None else "end"
     while not state.is_terminal():
         actions = state.possible_actions_list
         kind = _action_kind(actions)
         if kind == "win_trick":
+            if (
+                event is not None
+                and event.kind == "pass"
+                and actions[0].player_pos == event.player
+            ):
+                break
             state = state.next_state(actions[0])
             continue
         if kind == "wish" and event_kind != "wish":
             no_wish = next(action for action in actions if action.wish is None)
             state = state.next_state(no_wish)
+            continue
+        if kind == "bomb":
+            # BSW only records a bomb when it is played, not each player's
+            # implicit decision to refrain from bombing.  Preserve a matching
+            # logged bomb and auto-advance all omitted declines.
+            if event is not None and event.kind == "play":
+                matching, _ = _matching_action(state, event)
+                if isinstance(matching, PlayBomb):
+                    break
+            decline = next(
+                action for action in actions if isinstance(action, PassBombAction)
+            )
+            state = state.next_state(decline)
             continue
         break
     return state
@@ -191,6 +218,11 @@ def _equivalent_physical_actions(state, player, cards):
                 combination = Straight(
                     cards, phoenix_as=candidate.combination.phoenix_as
                 )
+            elif isinstance(candidate.combination, FullHouse) and Card.PHOENIX in cards:
+                combination = FullHouse.from_cards(
+                    cards,
+                    phoenix_as_trio_rank=candidate.combination.trio.rank,
+                )
             else:
                 combination = Combination.make(cards)
             if type(combination) is not type(candidate.combination):
@@ -247,9 +279,15 @@ def replay_round(round_):
     except Exception as error:
         return ReplayResult(status="setup_error", detail=str(error))
 
-    decisions = []
+    return _replay_from_event(round_, state, 0, [])
+
+
+def _replay_from_event(round_, state, start_index, decisions):
+    """Replay events, branching only when a logged Phoenix role is ambiguous."""
+
     ignored = {"grand_tichu", "tichu", "bomb_notice"}
-    for event_index, event in enumerate(round_.events):
+    for event_index in range(start_index, len(round_.events)):
+        event = round_.events[event_index]
         if event.kind in ignored:
             continue
         try:
@@ -262,7 +300,25 @@ def replay_round(round_):
                 # BSW explicitly records the leading player's final pass.  In
                 # this engine the trick has already finished at that point.
                 continue
-            state = _prepare_for_event(state, event.kind)
+            state = _prepare_for_event(state, event)
+            pending_kind = _action_kind(state.possible_actions_list)
+            if (
+                event.kind == "pass"
+                and state.trick_on_table.is_empty()
+                and state.player_pos == event.player
+            ):
+                # BSW may print the previous trick winner's final pass after
+                # all hidden between-trick bomb declines were resolved.  A
+                # pass cannot be a real action on an empty table.
+                continue
+            if (
+                event.kind == "pass"
+                and pending_kind in {"win_trick", "dragon"}
+                and state.possible_actions_list[0].player_pos == event.player
+            ):
+                # A hidden bomb window may have been auto-declined above before
+                # reaching BSW's explicit final leader pass.
+                continue
             if state.is_terminal():
                 if event.kind in {"wish", "dragon_to"}:
                     # BSW may print the administrative result of the last play
@@ -286,6 +342,32 @@ def replay_round(round_):
                         _action_kind(state.possible_actions_list),
                     ),
                 )
+            if len(matches) > 1:
+                branch_results = []
+                for match in matches:
+                    branch_decisions = list(decisions)
+                    if event.kind in {"play", "pass"}:
+                        branch_decisions.append((state, event, match))
+                    try:
+                        branch_state = _apply_action(state, match)
+                    except Exception as error:
+                        branch_results.append(
+                            ReplayResult(
+                                status="engine_error",
+                                decisions=branch_decisions,
+                                event_index=event_index,
+                                detail="{}: {}".format(type(error).__name__, error),
+                            )
+                        )
+                        continue
+                    branch_results.append(
+                        _replay_from_event(
+                            round_, branch_state, event_index + 1, branch_decisions
+                        )
+                    )
+
+                return _best_branch_result(branch_results)
+
             if event.kind in {"play", "pass"}:
                 decisions.append((state, event, action))
             state = _apply_action(state, action)
@@ -298,7 +380,7 @@ def replay_round(round_):
             )
 
     try:
-        state = _prepare_for_event(state, "end")
+        state = _prepare_for_event(state)
         if not state.is_terminal():
             return ReplayResult(
                 status="not_terminal",
@@ -315,6 +397,7 @@ def replay_round(round_):
             decisions=decisions,
             expected_scores=round_.scores,
             actual_scores=actual,
+            final_state=state,
         )
     except Exception as error:
         return ReplayResult(
@@ -324,7 +407,52 @@ def replay_round(round_):
         )
 
 
-def scan_directory(input_dir, report_path=None):
+def _best_branch_result(results):
+    """Prefer exact, then complete, then furthest-progressing replay branches."""
+    exact = next((result for result in results if result.status == "ok"), None)
+    if exact is not None:
+        return exact
+    completed = next(
+        (result for result in results if result.status == "score_mismatch"), None
+    )
+    if completed is not None:
+        return completed
+    return max(
+        results,
+        key=lambda result: (
+            result.event_index is not None,
+            result.event_index if result.event_index is not None else -1,
+        ),
+    )
+
+
+def _replay_path(path):
+    """Replay one file and return only serialization-safe summary rows."""
+    path = Path(path)
+    game = parse_file(path)
+    rows = []
+    decisions = 0
+    for round_index, round_ in enumerate(game.rounds):
+        result = replay_round(round_)
+        decisions += len(result.decisions)
+        rows.append(
+            {
+                "game_id": int(path.stem),
+                "round": round_index,
+                "status": result.status,
+                "event_index": result.event_index,
+                "detail": result.detail,
+                "decisions": len(result.decisions),
+                "expected_scores": result.expected_scores,
+                "actual_scores": result.actual_scores,
+            }
+        )
+    return rows, decisions
+
+
+def scan_directory(input_dir, report_path=None, *, show_progress=False, workers=1):
+    if workers < 1:
+        raise ValueError("workers must be positive")
     counts = Counter()
     games = rounds = decisions = 0
     output = None
@@ -333,33 +461,39 @@ def scan_directory(input_dir, report_path=None):
         report_path.parent.mkdir(parents=True, exist_ok=True)
         output = report_path.open("w", encoding="utf-8", newline="\n")
     try:
-        for path in sorted(Path(input_dir).glob("*.tch")):
-            game = parse_file(path)
+        paths = sorted(Path(input_dir).glob("*.tch"))
+        progress_step = max(1, len(paths) // 20)
+        executor = ProcessPoolExecutor(max_workers=workers) if workers > 1 else None
+        results = (
+            executor.map(_replay_path, paths, chunksize=1)
+            if executor is not None
+            else map(_replay_path, paths)
+        )
+        for path_index, (file_rows, file_decisions) in enumerate(results, start=1):
             games += 1
-            for round_index, round_ in enumerate(game.rounds):
-                result = replay_round(round_)
+            decisions += file_decisions
+            for row in file_rows:
                 rounds += 1
-                decisions += len(result.decisions)
-                counts[result.status] += 1
+                counts[row["status"]] += 1
                 if output:
                     output.write(
-                        json.dumps(
-                            {
-                                "game_id": int(path.stem),
-                                "round": round_index,
-                                "status": result.status,
-                                "event_index": result.event_index,
-                                "detail": result.detail,
-                                "decisions": len(result.decisions),
-                                "expected_scores": result.expected_scores,
-                                "actual_scores": result.actual_scores,
-                            },
-                            ensure_ascii=False,
-                            sort_keys=True,
-                        )
+                        json.dumps(row, ensure_ascii=False, sort_keys=True)
                         + "\n"
                     )
+            if show_progress and (
+                path_index == len(paths) or path_index % progress_step == 0
+            ):
+                percent = 100.0 * path_index / max(1, len(paths))
+                print(
+                    "[replay] {}/{} files ({:.0f}%)".format(
+                        path_index, len(paths), percent
+                    ),
+                    file=sys.stderr,
+                    flush=True,
+                )
     finally:
+        if "executor" in locals() and executor is not None:
+            executor.shutdown()
         if output:
             output.close()
     return {
@@ -376,8 +510,21 @@ def main():
     parser.add_argument(
         "--report", default="datasets/processed/brettspielwelt-replay-report.jsonl"
     )
+    parser.add_argument("--workers", type=int, default=1)
     args = parser.parse_args()
-    print(json.dumps(scan_directory(args.input_dir, args.report), sort_keys=True))
+    if args.workers < 1:
+        raise SystemExit("--workers must be positive")
+    print(
+        json.dumps(
+            scan_directory(
+                args.input_dir,
+                args.report,
+                show_progress=True,
+                workers=args.workers,
+            ),
+            sort_keys=True,
+        )
+    )
 
 
 if __name__ == "__main__":

@@ -59,6 +59,28 @@ The verified Brettspielwelt decisions can also train a supervised legal-action
 ranking baseline. See [docs/behavior-cloning.md](./docs/behavior-cloning.md) for
 the Docker smoke test, full training command, and validation metrics.
 
+## Download recent Brettspielwelt logs
+
+The downloader can discover the newest numeric log id, resume from cached
+files, and work backwards until the directory contains a requested number of
+complete games. This PowerShell command collects 10,000 complete logs with at
+most eight concurrent requests:
+
+```powershell
+docker compose run --rm --entrypoint python tests `
+  scraper/download_brettspielwelt.py `
+  --discover-latest `
+  --latest-id 2419834 `
+  --target-total 10000 `
+  --workers 8 `
+  --delay 0.1 `
+  --progress-every 250
+```
+
+`--latest-id` is a known-valid hint, not a fixed upper bound. Re-running the
+same command safely skips cached files. Raw logs and the append-only download
+manifest are stored under `datasets/raw/brettspielwelt` and are ignored by Git.
+
 ## Dependencies
 **Python 3.6+**
 
