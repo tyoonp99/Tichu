@@ -2,6 +2,7 @@ import pytest
 
 from gym_tichu.envs.internals.cards import (
     Card,
+    CardRank,
     CardSet,
     Combination,
     FullHouse,
@@ -24,6 +25,101 @@ def test_single_uses_card_height():
 def test_dragon_beats_ace_and_dog_cannot_beat_two():
     assert Single(Card.DRAGON).can_be_played_on(Single(Card.A_JADE))
     assert not Single(Card.DOG).can_be_played_on(Single(Card.TWO_JADE))
+
+
+def test_straight_bomb_beats_square_bomb():
+    square = SquareBomb(
+        Card.A_JADE,
+        Card.A_HOUSE,
+        Card.A_SWORD,
+        Card.A_PAGODA,
+    )
+    straight = StraightBomb.from_cards(
+        Card.TWO_JADE,
+        Card.THREE_JADE,
+        Card.FOUR_JADE,
+        Card.FIVE_JADE,
+        Card.SIX_JADE,
+    )
+
+    assert straight.can_be_played_on(square)
+    assert not square.can_be_played_on(straight)
+
+
+def test_longer_straight_bomb_beats_shorter_straight_bomb():
+    short = StraightBomb.from_cards(
+        Card.TEN_JADE,
+        Card.J_JADE,
+        Card.Q_JADE,
+        Card.K_JADE,
+        Card.A_JADE,
+    )
+    long = StraightBomb.from_cards(
+        Card.TWO_HOUSE,
+        Card.THREE_HOUSE,
+        Card.FOUR_HOUSE,
+        Card.FIVE_HOUSE,
+        Card.SIX_HOUSE,
+        Card.SEVEN_HOUSE,
+    )
+
+    assert long.can_be_played_on(short)
+    assert not short.can_be_played_on(long)
+
+
+def test_pairsteps_can_be_reconstructed_from_physical_cards():
+    combination = Combination.make(
+        {
+            Card.THREE_JADE,
+            Card.THREE_SWORD,
+            Card.FOUR_HOUSE,
+            Card.FOUR_PAGODA,
+        }
+    )
+
+    assert combination.__class__.__name__ == "PairSteps"
+    assert combination.cards == {
+        Card.THREE_JADE,
+        Card.THREE_SWORD,
+        Card.FOUR_HOUSE,
+        Card.FOUR_PAGODA,
+    }
+
+
+def test_phoenix_pairsteps_can_be_reconstructed_from_physical_cards():
+    combination = Combination.make(
+        {
+            Card.PHOENIX,
+            Card.THREE_JADE,
+            Card.FOUR_HOUSE,
+            Card.FOUR_PAGODA,
+        }
+    )
+
+    assert combination.__class__.__name__ == "PairSteps"
+    assert combination.cards == {
+        Card.PHOENIX,
+        Card.THREE_JADE,
+        Card.FOUR_HOUSE,
+        Card.FOUR_PAGODA,
+    }
+
+
+def test_phoenix_fullhouse_can_choose_which_pair_becomes_the_trio():
+    cards = {
+        Card.PHOENIX,
+        Card.TEN_JADE,
+        Card.TEN_SWORD,
+        Card.K_HOUSE,
+        Card.K_PAGODA,
+    }
+
+    kings_high = FullHouse.from_cards(cards, phoenix_as_trio_rank=CardRank.K)
+    tens_high = FullHouse.from_cards(cards, phoenix_as_trio_rank=CardRank.TEN)
+
+    assert kings_high.trio.rank is CardRank.K
+    assert tens_high.trio.rank is CardRank.TEN
+    assert kings_high.height > tens_high.height
 
 
 def test_pair_requires_matching_ranks():
@@ -148,6 +244,51 @@ def test_phoenix_can_fill_gap_in_straight():
     assert straight.contains_phoenix()
     assert straight.lowest.value == 2
     assert straight.highest.value == 6
+
+
+def test_phoenix_can_supply_ten_before_jack_high_straight():
+    cards = CardSet(
+        {
+            Card.PHOENIX,
+            Card.J_SWORD,
+            Card.Q_PAGODA,
+            Card.K_JADE,
+            Card.A_HOUSE,
+        }
+    )
+
+    straights = list(cards.straights())
+
+    assert any(
+        straight.phoenix_as is not None
+        and straight.phoenix_as.rank is CardRank.TEN
+        for straight in straights
+    )
+
+
+def test_natural_straight_beats_equal_height_phoenix_straight():
+    phoenix_straight = Straight(
+        {
+            Card.SIX_JADE,
+            Card.SEVEN_SWORD,
+            Card.EIGHT_PAGODA,
+            Card.NINE_HOUSE,
+            Card.PHOENIX,
+        },
+        phoenix_as=Card.TEN_SWORD,
+    )
+    natural_straight = Straight(
+        {
+            Card.SIX_SWORD,
+            Card.SEVEN_PAGODA,
+            Card.EIGHT_HOUSE,
+            Card.NINE_JADE,
+            Card.TEN_HOUSE,
+        }
+    )
+
+    assert natural_straight.can_be_played_on(phoenix_straight)
+    assert not phoenix_straight.can_be_played_on(natural_straight)
 
 
 def test_square_bomb_requires_four_cards_of_same_rank():

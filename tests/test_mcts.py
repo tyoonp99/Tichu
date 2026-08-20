@@ -1,9 +1,34 @@
 from pathlib import Path
 
 from gym_agents.combination_weights import CombinationWeights
-from gym_agents.mcts import make_default_ismctsearch, make_fuegi_ismctsearch
+from gym_agents.mcts import (
+    make_default_ismctsearch,
+    make_fuegi_ismctsearch,
+    unique_infoset_id,
+)
 from gym_tichu.envs.internals.actions import PassAction, PlayFirst, Trick
 from gym_tichu.envs.internals.cards import Card, Single
+
+
+def test_bomb_response_phase_has_distinct_information_set_id(state_factory):
+    normal = state_factory(
+        [
+            {Card.TWO_JADE},
+            {Card.THREE_JADE},
+            {Card.FOUR_JADE},
+            {Card.FIVE_JADE},
+        ],
+        player_pos=2,
+    )
+    bomb_response = normal.change(
+        player_pos=2,
+        bomb_window=(2,),
+        bomb_resume_player=1,
+    )
+
+    assert unique_infoset_id(normal, observer_id=0) != unique_infoset_id(
+        bomb_response, observer_id=0
+    )
 
 
 def test_packaged_combination_weights_can_be_loaded_without_scraper():

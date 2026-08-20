@@ -728,11 +728,15 @@ class CardSet(TypedFrozenSet):
                 for c in sorted_cards:
                     if c.rank <= max_start_rank:
                         yield from gen_from(c, 5, ph=None)  # all straights starting with normal card
-                        # all straights starting with the Phoenix:
-                        if has_phoenix and c.rank > CardRank.TWO:
-                            phoenix = card_rank_to_sword_card[c.rank - 1]
-                            for st in gen_from(c, 4, ph=phoenix):
-                                yield {Card.PHOENIX: phoenix, **st}
+
+                    # A Phoenix may represent the rank immediately before the
+                    # first natural card.  In particular, 10-J-Q-K-A starts
+                    # from J when the Phoenix represents the 10, so its start
+                    # bound is one rank higher than for a natural straight.
+                    if has_phoenix and CardRank.TWO < c.rank <= CardRank.J:
+                        phoenix = card_rank_to_sword_card[c.rank - 1]
+                        for st in gen_from(c, 4, ph=phoenix):
+                            yield {Card.PHOENIX: phoenix, **st}
 
             # make and yield the Straights:
             gen = (Straight(set(st.keys()), phoenix_as=st.get(Card.PHOENIX, None)) for st in gen_all_straights())
@@ -1215,18 +1219,38 @@ class FullHouse(Combination):
         return self._pair
 
     @classmethod
-    def from_cards(cls, cards: Iterable[Card]):
+    def from_cards(cls, cards: Iterable[Card], phoenix_as_trio_rank: Optional[CardRank]=None):
         check_param(len(set(cards)) == 5)  # 5 different cards
-        check_param(Card.PHOENIX not in cards, "can't make from cards when Phoenix is present")
+        cards = CardSet(cards)
+        has_phoenix = Card.PHOENIX in cards
         pair = None
         trio = None
-        for cs in CardSet(cards).rank_dict().values():
-            if len(cs) == 2:
-                pair = Pair(*cs)
-            elif len(cs) == 3:
-                trio = Trio(*cs)
+        rank_groups = cards.rank_dict(exclude_special=True)
+        if has_phoenix:
+            counts = sorted(map(len, rank_groups.values()))
+            if counts == [2, 2]:
+                trio_rank = phoenix_as_trio_rank or max(rank_groups)
+                check_param(trio_rank in rank_groups)
+                trio = Trio(*rank_groups[trio_rank], Card.PHOENIX)
+                pair_cards = next(
+                    group for rank, group in rank_groups.items() if rank is not trio_rank
+                )
+                pair = Pair(*pair_cards)
+            elif counts == [1, 3]:
+                trio_cards = next(group for group in rank_groups.values() if len(group) == 3)
+                pair_card = next(group[0] for group in rank_groups.values() if len(group) == 1)
+                trio = Trio(*trio_cards)
+                pair = Pair(pair_card, Card.PHOENIX)
             else:
-                check_true(len(cs) == 0, ex=ValueError, msg="there is no fullhouse in the cards (cards: {})".format(cards))  # if this fails, then there is no fullhouse in the cards
+                raise ValueError("there is no fullhouse in the cards: {}".format(cards))
+        else:
+            for cs in rank_groups.values():
+                if len(cs) == 2:
+                    pair = Pair(*cs)
+                elif len(cs) == 3:
+                    trio = Trio(*cs)
+                else:
+                    raise ValueError("there is no fullhouse in the cards: {}".format(cards))
         return cls(pair, trio)
 
     def _can_be_played_on(self, other: 'FullHouse') -> bool:
@@ -1281,12 +1305,18 @@ class PairSteps(Combination):
     @classmethod
     def from_cards(cls, cards: Collection[Card]):
         check_param(len(cards) >= 4 and len(cards) % 2 == 0)
-        check_param(Card.PHOENIX not in cards, "Can't make pairstep from cards when Phoenix is present")
+        has_phoenix = Card.PHOENIX in cards
         pairs = []
-        for cs in CardSet(cards).rank_dict().values():
+        phoenix_used = False
+        for cs in CardSet(cards).rank_dict(exclude_special=True).values():
             if len(cs) == 2:
                 pairs.append(Pair(*cs))
-            check_true(len(cs) == 0, ex=ValueError, msg="Not a pairstep")
+            elif len(cs) == 1 and has_phoenix and not phoenix_used:
+                pairs.append(Pair(cs[0], Card.PHOENIX))
+                phoenix_used = True
+            else:
+                raise ValueError("Not a pairstep")
+        check_true(phoenix_used == has_phoenix, ex=ValueError, msg="Not a pairstep")
         return cls(pairs)
 
     def extend(self, pair: Pair):
@@ -1346,7 +1376,14 @@ class Straight(Combination):
         return self._highest_rank
 
     def _can_be_played_on(self, other: 'Straight') -> bool:
-        return len(self) == len(other) and self.height > other.height
+        if len(self) != len(other):
+            return False
+        if self.height != other.height:
+            return self.height > other.height
+
+        # BrettspielWelt treats a natural straight as stronger than an
+        # otherwise equal straight whose missing rank is supplied by Phoenix.
+        return not self.contains_phoenix() and other.contains_phoenix()
 
     def __eq__(self, other):
         if self.contains_phoenix():
@@ -1375,6 +1412,14 @@ class Bomb(Combination, metaclass=abc.ABCMeta):
 
     def is_bomb(self)->bool:
         return True
+
+    def can_be_played_on(self, other: Optional['Combination']) -> bool:
+        """Bombs beat normal combinations; larger bombs beat smaller bombs."""
+        if other is None or not isinstance(other, Bomb):
+            return True
+        if len(self) != len(other):
+            return len(self) > len(other)
+        return self.height > other.height
 
 
 class SquareBomb(Bomb):
@@ -1430,7 +1475,7 @@ class StraightBomb(Bomb):
         return cls(Straight(cards))
 
     def _can_be_played_on(self, other: 'StraightBomb') -> bool:
-        return len(self) == len(other) and self.height > other.height
+        return (len(self), self.height) > (len(other), other.height)
 
 # ######################### General Combination #########################
 

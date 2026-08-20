@@ -17,6 +17,7 @@ from gym_tichu.envs.internals import (
     CardTrade,
     HandCards,
     PassAction,
+    PassBombAction,
     PlayCombination,
     PlayerAction,
     TichuState,
@@ -257,7 +258,7 @@ class HumanInputAgent(DefaultGymAgent):
         possible_combinations = []
         comb_action_dict = {}
         for action in possible_actions:
-            if isinstance(action, PassAction):
+            if isinstance(action, (PassAction, PassBombAction)):
                 pass_ = "PASS"
                 comb_action_dict[pass_] = action
             else:

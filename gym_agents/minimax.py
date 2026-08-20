@@ -4,7 +4,7 @@ from typing import Optional, Union, Hashable, NewType, TypeVar, Tuple, List, Dic
 from time import time
 from profilehooks import timecall, profile
 
-from gym_tichu.envs.internals import (TichuState, PlayerAction, PassAction)
+from gym_tichu.envs.internals import (TichuState, PlayerAction, PassAction, PassBombAction)
 from gym_tichu.envs.internals.utils import check_param, flatten, time_since
 
 logger = logging.getLogger(__name__)
@@ -33,7 +33,7 @@ class Minimax(object):
             return asts[0][0]
 
         # sort actions for better pruning
-        asts_sorted = sorted(asts, key=lambda a_s: float("inf") if isinstance(a_s[0], PassAction) else len(a_s[0].combination))  # sort: low combinations first, Passing last.
+        asts_sorted = sorted(asts, key=lambda a_s: float("inf") if isinstance(a_s[0], (PassAction, PassBombAction)) else len(a_s[0].combination))  # sort: low combinations first, Passing last.
 
         # start minimax search
         res = [(a, self.min_value(state=s.copy_discard_history(), alpha=-float("inf"), beta=float("inf"), depth=0, playerpos=root_state.player_pos)) for a, s in asts_sorted]

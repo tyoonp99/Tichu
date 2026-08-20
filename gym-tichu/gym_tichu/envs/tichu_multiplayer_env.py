@@ -125,7 +125,7 @@ class TichuSinglePlayerEnv(TichuMultiplayerEnv):
         first_action = state.possible_actions_list[0]
         # Note: for both tichu and wish action, state.player_pos is not the same as action.player_pos, it is the pos of the next player to play a combination
 
-        while not isinstance(first_action, (PassAction, PlayCombination)) or first_action.player_pos != 0:
+        while not isinstance(first_action, (PassAction, PassBombAction, PlayCombination)) or first_action.player_pos != 0:
             # logger.debug("state: {}".format(state))
             # No TICHU
             if isinstance(first_action, TichuAction):
@@ -142,7 +142,7 @@ class TichuSinglePlayerEnv(TichuMultiplayerEnv):
                 curr_state, curr_reward, done, _, info = super().step(first_action)
 
             # Play Combination
-            elif isinstance(first_action, (PassAction, PlayCombination)):
+            elif isinstance(first_action, (PassAction, PassBombAction, PlayCombination)):
                 assert curr_state.player_pos != 0
                 # other agents choose action
 

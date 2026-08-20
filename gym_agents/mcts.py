@@ -74,6 +74,9 @@ def unique_infoset_id(state: TichuState, observer_id: int) -> str:
                 tuple(state.ranking),
                 sorted(state.announced_tichu),
                 sorted(state.announced_grand_tichu),
+                tuple(state.bomb_window),
+                state.bomb_resume_player,
+                state.bomb_trick_finish,
                 _uid_trick(state.trick_on_table),
                 sum(map(len, state.won_tricks)),  # how many tricks have been won so far
                 *map(_uid_trick, state.won_tricks.iter_all_tricks()),
@@ -332,6 +335,21 @@ class Ismcts(object):
         nid = self.graph_node_id(state)
         return self.graph.nodes[nid]['record']
 
+    def _tree_transition(self, state: TichuState, action: PlayerAction) -> TichuState:
+        """Apply an action and register its determinization-specific child.
+
+        The same information-set action can lead to a different public bomb
+        response state depending on hidden hands.  Those alternate children
+        are discovered lazily while traversing determinizations.
+        """
+        next_state = state.next_state(action)
+        self.add_child_node(
+            from_nid=self.graph_node_id(state),
+            to_nid=self.graph_node_id(next_state),
+            action=action,
+        )
+        return next_state
+
     def add_child_node(self, from_nid: Optional[NodeID] = None, to_nid: Optional[NodeID] = None, action: Optional[PlayerAction] = None) -> None:
         """
         Adds a node for each infoset (if not already in graph) and an edge from the from_infoset to the to_infoset
@@ -488,13 +506,17 @@ class UCBTreePolicy(TreePolicy, metaclass=abc.ABCMeta):
             if not self.is_fully_expanded(curr_state):
                 self.expand(curr_state)
                 # select one of the nodes that just were expanded
-                ret_state = curr_state.next_state(self.tree_selection(curr_state))
+                ret_state = self._tree_transition(
+                    curr_state, self.tree_selection(curr_state)
+                )
                 # add the returned sate to the visited nodes
                 self._visited_records.add(self._record_for_state(ret_state))
                 return ret_state
             else:
                 # No expanding, just select next node
-                curr_state = curr_state.next_state(self.tree_selection(curr_state))
+                curr_state = self._tree_transition(
+                    curr_state, self.tree_selection(curr_state)
+                )
                 # add curr_state to visited nodes
                 self._visited_records.add(self._record_for_state(curr_state))
 

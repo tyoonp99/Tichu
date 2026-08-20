@@ -127,7 +127,9 @@ class TichuGame(object):
                 # the agent chooses an action
                 chosen_action = self._agents[current_player].action(curr_state)
 
-                if isinstance(chosen_action, PassAction):
+                if isinstance(chosen_action, PassBombAction):
+                    console_logger.info("[NO BOMB] {}".format(current_player))
+                elif isinstance(chosen_action, PassAction):
                     console_logger.info("[PASS] {}".format(current_player))
                 else:
                     console_logger.info("[PLAY] {} plays {}".format(current_player, chosen_action))

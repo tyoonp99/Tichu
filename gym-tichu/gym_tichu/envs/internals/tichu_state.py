@@ -9,11 +9,11 @@ import logging
 import itertools
 import random
 
-from .actions import pass_actions, tichu_actions, no_tichu_actions, play_dog_actions, all_wish_actions_gen, TradeAction, \
+from .actions import pass_actions, pass_bomb_actions, tichu_actions, no_tichu_actions, play_dog_actions, all_wish_actions_gen, TradeAction, \
     MutableTrick
-from .actions import (PlayerAction, PlayCombination, PlayFirst, PlayBomb, TichuAction, WishAction, PassAction,
+from .actions import (PlayerAction, PlayCombination, PlayFirst, PlayBomb, TichuAction, WishAction, PassAction, PassBombAction,
                       WinTrickAction, GiveDragonAwayAction, CardTrade, Trick)
-from .cards import CardSet, Card, CardRank, Deck, DOG_COMBINATION
+from .cards import CardSet, Card, CardRank, Deck, DOG_COMBINATION, Straight
 from .error import TichuEnvValueError, LogicError, IllegalActionError
 from .utils import check_param, check_isinstance, check_all_isinstance, check_true
 
@@ -414,14 +414,32 @@ class BaseTichuState(object, metaclass=abc.ABCMeta):
                 yield no_tichu_actions[last_act.player_pos]
                 return  # player has to decide whether to announce a tichu or not
 
+        # Store the last played combination before resolving follow-up phases.
+        last_combination_action = self.trick_on_table.last_combination_action
+        last_combination = self.trick_on_table.last_combination
+
+        # ######### wish? #########
+        # Declaring the Mahjong wish is part of that play and precedes bomb
+        # responses to it.
+        if (self._allow_wish and not self.history.wished()) and (not self.trick_on_table.is_empty()) and Card.MAHJONG in last_combination:
+            yield from all_wish_actions_gen(self.trick_on_table.last_combination_action.player_pos)
+            return
+
+        # ######### out-of-turn bomb response? #########
+        # A bomb window is resolved before normal play, trick collection, or
+        # round termination.  Only players who actually have a legal bomb are
+        # included, so deterministic "no bomb" responses do not add states.
+        if self.bomb_window:
+            bomb_player = self.bomb_window[0]
+            assert self.player_pos == bomb_player
+            yield pass_bomb_actions[bomb_player]
+            yield from self._bomb_actions(player=bomb_player)
+            return
+
         # ######### Round Ends with double win? #########
         if self.is_double_win():
             assert self.is_terminal()  # -> No action possible
             return
-
-        # store last played combination (action)
-        last_combination_action = self.trick_on_table.last_combination_action
-        last_combination = self.trick_on_table.last_combination
 
         # ######### Round ends with the 3rd player finishing? #########
         if len(self.ranking) >= 3:  # Round ends -> terminal
@@ -429,15 +447,22 @@ class BaseTichuState(object, metaclass=abc.ABCMeta):
                 assert self.is_terminal()  # -> No action possible
                 return
             else:
-                # give the remaining trick on table to leader
-                yield WinTrickAction(player_pos=last_combination_action.player_pos, trick=self.trick_on_table)
+                # The final trick still follows Dragon's mandatory gifting
+                # rule even when the play also makes the third player finish.
+                winner = last_combination_action.player_pos
+                if Card.DRAGON in last_combination:
+                    yield GiveDragonAwayAction(
+                        winner, (winner + 1) % 4, trick=self.trick_on_table
+                    )
+                    yield GiveDragonAwayAction(
+                        winner, (winner - 1) % 4, trick=self.trick_on_table
+                    )
+                else:
+                    # give the remaining trick on table to leader
+                    yield WinTrickAction(
+                        player_pos=winner, trick=self.trick_on_table
+                    )
             return  # Round ends
-
-        # ######### wish? #########
-        if (self._allow_wish and not self.history.wished()) and (not self.trick_on_table.is_empty()) and Card.MAHJONG in last_combination:
-            # Note that self.player_pos is not equal to the wishing player pos.
-            yield from all_wish_actions_gen(self.trick_on_table.last_combination_action.player_pos)
-            return  # Player must wish something, no other actions allowed
 
         # ######### trick ended? #########
         if self.trick_on_table.is_finished():
@@ -466,6 +491,15 @@ class BaseTichuState(object, metaclass=abc.ABCMeta):
         if self.wish and self._current_player_handcards.contains_cardrank(self.wish):
             # player may have to fulfill the wish
             possible_combinations_wish = list(self._current_player_handcards.possible_combinations(played_on=last_combination, contains_rank=self.wish))
+            if isinstance(last_combination, Straight) and last_combination.contains_phoenix():
+                # BrettspielWelt permits a natural straight to beat an equal
+                # Phoenix straight, but does not count that tie-break as a
+                # mandatory way to fulfil a wish.
+                possible_combinations_wish = [
+                    combination
+                    for combination in possible_combinations_wish
+                    if combination.height > last_combination.height
+                ]
             if len(possible_combinations_wish) > 0:
                 # player can and therefore has to fulfill the wish
                 can_fulfill_wish = True
@@ -481,10 +515,10 @@ class BaseTichuState(object, metaclass=abc.ABCMeta):
         for comb in possible_combinations:
             if comb == DOG_COMBINATION:
                 yield play_dog_actions[self.player_pos]
+            elif comb.is_bomb():
+                yield PlayBomb(player_pos=self.player_pos, combination=comb)
             else:
                 yield PlayactionClass(player_pos=self.player_pos, combination=comb)
-
-        # TODO bombs ?
 
     def next_state(self, action: PlayerAction)->'TichuState':
         if action not in self.possible_actions_set:
@@ -505,6 +539,10 @@ class BaseTichuState(object, metaclass=abc.ABCMeta):
         # win trick (includes dragon away)?
         elif isinstance(action, WinTrickAction):
             next_s = self._next_state_on_win_trick(action)
+
+        # decline an out-of-turn bomb
+        elif isinstance(action, PassBombAction):
+            next_s = self._next_state_on_pass_bomb(action)
 
         # pass
         elif isinstance(action, PassAction):
@@ -578,10 +616,59 @@ class BaseTichuState(object, metaclass=abc.ABCMeta):
         # except StopIteration:
         #     # happens only right before the game ends
         #     next_player_pos = leading_player
-        if (leading_player == next_player_pos
+        trick_finishes = (leading_player == next_player_pos
                 or self.player_pos < leading_player < next_player_pos
                 or next_player_pos < self.player_pos < leading_player
-                or leading_player < next_player_pos < self.player_pos):
+                or leading_player < next_player_pos < self.player_pos)
+        next_trick = self.trick_on_table + pass_action
+        leader_finished = not len(self.handcards[leading_player])
+        if (
+            trick_finishes
+            and leader_finished
+            and Card.DRAGON not in next_trick.last_combination
+        ):
+            resume_player = (
+                leading_player
+                if len(self.handcards[leading_player])
+                else self._next_player_from(leading_player, handcards=self.handcards)
+            )
+            bomb_window = self._open_bomb_window_for(
+                handcards=self.handcards,
+                start_player=resume_player,
+            )
+            if bomb_window:
+                finished_trick = next_trick.finish()
+                return self.change(
+                    player_pos=bomb_window[0],
+                    won_tricks=self.won_tricks.add_trick(
+                        player=leading_player, trick=finished_trick
+                    ),
+                    trick_on_table=Trick(),
+                    bomb_window=bomb_window,
+                    bomb_resume_player=resume_player,
+                    bomb_trick_finish=False,
+                    history=self.history.new_state_action(self, pass_action),
+                )
+
+        bomb_window = self._bomb_window_for(
+            handcards=self.handcards,
+            trick_on_table=next_trick,
+            start_player=next_player_pos,
+        ) if (
+            not trick_finishes
+            or not leader_finished
+            or Card.DRAGON in next_trick.last_combination
+        ) else ()
+        if bomb_window:
+            return self.change(
+                    player_pos=bomb_window[0],
+                    trick_on_table=next_trick,
+                    bomb_window=bomb_window,
+                    bomb_resume_player=leading_player if trick_finishes else next_player_pos,
+                    bomb_trick_finish=trick_finishes,
+                    history=self.history.new_state_action(self, pass_action)
+            )
+        if trick_finishes:
             # trick ends with leading as winner
             return self.change(
                     player_pos=leading_player,
@@ -601,40 +688,138 @@ class BaseTichuState(object, metaclass=abc.ABCMeta):
 
         # remove from handcards and add to trick on table
         next_trick_on_table = self.trick_on_table + comb_action
-        next_handcards = self.handcards.remove_cards(player=self.player_pos, cards=played_comb.cards)
+        next_handcards = self.handcards.remove_cards(player=comb_action.player_pos, cards=played_comb.cards)
 
-        assert len(next_handcards[self.player_pos]) < len(self.handcards[self.player_pos])
-        assert next_handcards[self.player_pos].issubset(self.handcards[self.player_pos])
+        assert len(next_handcards[comb_action.player_pos]) < len(self.handcards[comb_action.player_pos])
+        assert next_handcards[comb_action.player_pos].issubset(self.handcards[comb_action.player_pos])
 
         # ranking
         next_ranking = self.ranking
-        if len(next_handcards[self.player_pos]) == 0:
+        if len(next_handcards[comb_action.player_pos]) == 0:
             # player finished
-            next_ranking = self.ranking + (self.player_pos,)
-            assert self.player_pos not in self.ranking
+            next_ranking = self.ranking + (comb_action.player_pos,)
+            assert comb_action.player_pos not in self.ranking
             assert len(self.ranking) == len(set(self.ranking))
 
         # dog
         if played_comb == DOG_COMBINATION:
             assert self.trick_on_table.is_empty()
-            next_player_pos = (self.player_pos+2) % 4  # Teammate
+            next_player_pos = (comb_action.player_pos+2) % 4  # Teammate
 
         else:
             # next players turn
             # try:
-            next_player_pos = self._next_player_turn()
+            next_player_pos = self._next_player_from(
+                comb_action.player_pos, handcards=next_handcards
+            )
             # except StopIteration:
             #     # happens only right before the game ends
             #     next_player_pos = (comb_action.player_pos + 1) % 4
 
+        bomb_window = ()
+        if played_comb != DOG_COMBINATION:
+            bomb_window = self._bomb_window_for(
+                handcards=next_handcards,
+                trick_on_table=next_trick_on_table,
+                start_player=next_player_pos,
+            )
+
         # create state
         return self.change(
-                player_pos=next_player_pos,
+                player_pos=bomb_window[0] if bomb_window else next_player_pos,
                 handcards=next_handcards,
                 trick_on_table=next_trick_on_table,
                 wish=None if played_comb.contains_cardrank(self.wish) else self.wish,
                 ranking=next_ranking,
+                bomb_window=bomb_window,
+                bomb_resume_player=next_player_pos if bomb_window else None,
+                bomb_trick_finish=False,
                 history=self.history.new_state_action(self, comb_action)
+        )
+
+    def _next_state_on_pass_bomb(self, action: PassBombAction)->'TichuState':
+        assert self.bomb_window
+        assert action.player_pos == self.player_pos == self.bomb_window[0]
+        remaining = self.bomb_window[1:]
+        history = self.history.new_state_action(self, action)
+        if remaining:
+            return self.change(
+                player_pos=remaining[0],
+                bomb_window=remaining,
+                history=history,
+            )
+
+        resume_player = self.bomb_resume_player
+        assert resume_player in range(4)
+        if self.bomb_trick_finish:
+            return self.change(
+                player_pos=resume_player,
+                trick_on_table=self.trick_on_table.finish(),
+                bomb_window=(),
+                bomb_resume_player=None,
+                bomb_trick_finish=False,
+                history=history,
+            )
+        return self.change(
+            player_pos=resume_player,
+            bomb_window=(),
+            bomb_resume_player=None,
+            bomb_trick_finish=False,
+            history=history,
+        )
+
+    def _bomb_actions(self, player: int, *, handcards=None, trick_on_table=None):
+        handcards = self.handcards if handcards is None else handcards
+        trick_on_table = self.trick_on_table if trick_on_table is None else trick_on_table
+        played_on = trick_on_table.last_combination
+        if played_on is None:
+            if not self.bomb_window:
+                return ()
+            return tuple(
+                PlayBomb(player_pos=player, combination=combination)
+                for combination in handcards[player].all_bombs()
+            )
+        if played_on == DOG_COMBINATION:
+            return ()
+        return tuple(
+            PlayBomb(player_pos=player, combination=combination)
+            for combination in handcards[player].all_bombs()
+            if combination.can_be_played_on(played_on)
+        )
+
+    def _bomb_window_for(self, *, handcards, trick_on_table, start_player):
+        if trick_on_table.last_combination in (None, DOG_COMBINATION):
+            return ()
+        ordered_players = tuple(
+            position % 4 for position in range(start_player, start_player + 4)
+        )
+        return tuple(
+            player
+            for player in ordered_players
+            if len(handcards[player])
+            and self._bomb_actions(
+                player, handcards=handcards, trick_on_table=trick_on_table
+            )
+        )
+
+    @staticmethod
+    def _open_bomb_window_for(*, handcards, start_player):
+        """Return players able to lead a bomb between two completed tricks."""
+        ordered_players = tuple(
+            position % 4 for position in range(start_player, start_player + 4)
+        )
+        return tuple(
+            player
+            for player in ordered_players
+            if len(handcards[player]) and next(handcards[player].all_bombs(), None)
+        )
+
+    @staticmethod
+    def _next_player_from(player: int, *, handcards) -> int:
+        return next(
+            position % 4
+            for position in range(player + 1, player + 4)
+            if len(handcards[position % 4]) > 0
         )
 
     def _next_player_turn(self) -> int:
@@ -784,18 +969,40 @@ class TichuState(namedtuple("TichuState", [
             "ranking",
             "announced_tichu",
             "announced_grand_tichu",
-            "history"
+            "history",
+            "bomb_window",
+            "bomb_resume_player",
+            "bomb_trick_finish",
         ]), _BaseTichuStateImpl):
 
     __slots__ = ()
 
-    def __new__(cls, *args, allow_tichu=True, allow_wish=True, discard_history: bool=False, **kwargs):
-        return super().__new__(cls, *args, **kwargs)
+    def __new__(cls, player_pos, handcards, won_tricks, trick_on_table, wish,
+                ranking, announced_tichu, announced_grand_tichu, history,
+                bomb_window=(), bomb_resume_player=None, bomb_trick_finish=False,
+                *, allow_tichu=True, allow_wish=True, discard_history: bool=False):
+        return super().__new__(
+            cls,
+            player_pos,
+            handcards,
+            won_tricks,
+            trick_on_table,
+            wish,
+            ranking,
+            announced_tichu,
+            announced_grand_tichu,
+            history,
+            tuple(bomb_window),
+            bomb_resume_player,
+            bomb_trick_finish,
+        )
 
     def __init__(self, player_pos: int, handcards: HandCards, won_tricks: WonTricks,
                  trick_on_table: Trick, wish: Optional[CardRank], ranking: tuple,
                  announced_tichu: frozenset, announced_grand_tichu: frozenset,
-                 history: History, allow_tichu: bool=True, allow_wish: bool=True, discard_history:bool=False):
+                 history: History, bomb_window=(), bomb_resume_player=None,
+                 bomb_trick_finish=False, allow_tichu: bool=True,
+                 allow_wish: bool=True, discard_history:bool=False):
         super().__init__(allow_tichu=allow_tichu, allow_wish=allow_wish, discard_history=discard_history)
 
         # some paranoid checks
@@ -816,6 +1023,11 @@ class TichuState(namedtuple("TichuState", [
 
         assert isinstance(trick_on_table, Trick)
         assert isinstance(history, History)
+        assert isinstance(bomb_window, tuple)
+        assert all(player in range(4) for player in bomb_window)
+        assert bomb_resume_player is None or bomb_resume_player in range(4)
+        assert isinstance(bomb_trick_finish, bool)
+        assert bool(bomb_window) == (bomb_resume_player is not None)
 
     @timecall(immediate=False)
     def change(self, **attributes_to_change)->'TichuState':
@@ -1033,12 +1245,14 @@ class AfterTrading(TichuState):
 
 class RolloutTichuState(BaseTichuState):
     __slots__ = ('_handcards', '_announced_grand_tichu', '_announced_tichu', '_player_pos', '_won_tricks',
-                 '_trick_on_table', '_wish', '_ranking')
+                 '_trick_on_table', '_wish', '_ranking', '_bomb_window',
+                 '_bomb_resume_player', '_bomb_trick_finish')
 
     def __init__(self, player_pos: int, handcards: HandCards, won_tricks: WonTricks,
                  trick_on_table: Trick, wish: Optional[CardRank], ranking: tuple,
                  announced_tichu: frozenset, announced_grand_tichu: frozenset,
-                 history: History):
+                 history: History, bomb_window=(), bomb_resume_player=None,
+                 bomb_trick_finish=False):
         super().__init__(allow_tichu=False, allow_wish=False)
 
         assert isinstance(player_pos, int), str(player_pos)
@@ -1051,6 +1265,9 @@ class RolloutTichuState(BaseTichuState):
         self._ranking = list(ranking)
         self._announced_tichu = announced_tichu
         self._announced_grand_tichu = announced_grand_tichu
+        self._bomb_window = tuple(bomb_window)
+        self._bomb_resume_player = bomb_resume_player
+        self._bomb_trick_finish = bomb_trick_finish
         # self._history = history
 
     @classmethod
@@ -1093,6 +1310,18 @@ class RolloutTichuState(BaseTichuState):
     def won_tricks(self):
         return self._won_tricks
 
+    @property
+    def bomb_window(self):
+        return self._bomb_window
+
+    @property
+    def bomb_resume_player(self):
+        return self._bomb_resume_player
+
+    @property
+    def bomb_trick_finish(self):
+        return self._bomb_trick_finish
+
     def random_action(self)->PlayerAction:
         return random.choice(self.possible_actions_list)
 
@@ -1122,6 +1351,10 @@ class RolloutTichuState(BaseTichuState):
         # win trick (includes dragon away)?
         elif isinstance(action, WinTrickAction):
             self._apply_win_trick_action(action)
+
+        # decline an out-of-turn bomb
+        elif isinstance(action, PassBombAction):
+            self._apply_pass_bomb_action(action)
 
         # pass
         elif isinstance(action, PassAction):
@@ -1168,21 +1401,78 @@ class RolloutTichuState(BaseTichuState):
         assert isinstance(leading_player, int), str(leading_player)+" "+str(self.trick_on_table)
         next_player_pos = self._next_player_turn()
 
-        if (leading_player == next_player_pos
+        trick_finishes = (leading_player == next_player_pos
                 or self.player_pos < leading_player < next_player_pos
                 or next_player_pos < self.player_pos < leading_player
-                or leading_player < next_player_pos < self.player_pos):
+                or leading_player < next_player_pos < self.player_pos)
+        self._trick_on_table.append(pass_action)
+        leader_finished = not len(self.handcards[leading_player])
+        if (
+            trick_finishes
+            and leader_finished
+            and Card.DRAGON not in self.trick_on_table.last_combination
+        ):
+            resume_player = (
+                leading_player
+                if len(self.handcards[leading_player])
+                else self._next_player_from(leading_player, handcards=self.handcards)
+            )
+            bomb_window = self._open_bomb_window_for(
+                handcards=self.handcards,
+                start_player=resume_player,
+            )
+            if bomb_window:
+                finished_trick = self.trick_on_table.finish()
+                assert isinstance(self._won_tricks, MutableWonTricks)
+                self._won_tricks.add_trick(
+                    player=leading_player, trick=finished_trick
+                )
+                self._trick_on_table = MutableTrick()
+                self._bomb_window = bomb_window
+                self._bomb_resume_player = resume_player
+                self._bomb_trick_finish = False
+                self._player_pos = bomb_window[0]
+                return
+
+        bomb_window = self._bomb_window_for(
+            handcards=self.handcards,
+            trick_on_table=self.trick_on_table,
+            start_player=next_player_pos,
+        ) if (
+            not trick_finishes
+            or not leader_finished
+            or Card.DRAGON in self.trick_on_table.last_combination
+        ) else ()
+        if bomb_window:
+            self._bomb_window = bomb_window
+            self._bomb_resume_player = leading_player if trick_finishes else next_player_pos
+            self._bomb_trick_finish = trick_finishes
+            self._player_pos = bomb_window[0]
+        elif trick_finishes:
             # trick ends with leading as winner
             self._player_pos = leading_player
             assert isinstance(self.player_pos, int), str(self.player_pos)
-            self._trick_on_table = self.trick_on_table.finish(last_action=pass_action)
+            self._trick_on_table = self.trick_on_table.finish()
 
         else:
             self._player_pos = next_player_pos
-            assert isinstance(self._trick_on_table, MutableTrick)
             assert isinstance(next_player_pos, int), str(next_player_pos)
-            self._trick_on_table.append(pass_action)
         assert isinstance(self.player_pos, int), str(self.player_pos)
+
+    def _apply_pass_bomb_action(self, action: PassBombAction):
+        assert self.bomb_window
+        assert action.player_pos == self.player_pos == self.bomb_window[0]
+        remaining = self.bomb_window[1:]
+        if remaining:
+            self._bomb_window = remaining
+            self._player_pos = remaining[0]
+            return
+        self._bomb_window = ()
+        self._player_pos = self.bomb_resume_player
+        self._bomb_resume_player = None
+        if self.bomb_trick_finish:
+            self._trick_on_table = self.trick_on_table.finish()
+        self._bomb_trick_finish = False
 
     def _apply_combination(self, comb_action: PlayCombination):
         played_comb = comb_action.combination
@@ -1205,7 +1495,18 @@ class RolloutTichuState(BaseTichuState):
             assert len(self.trick_on_table) == 1, str(self.trick_on_table)
             self._player_pos = (self.player_pos + 2) % 4  # Teammate
         else:
-            self._player_pos = self._next_player_turn()
+            next_player = self._next_player_from(
+                comb_action.player_pos, handcards=self.handcards
+            )
+            bomb_window = self._bomb_window_for(
+                handcards=self.handcards,
+                trick_on_table=self.trick_on_table,
+                start_player=next_player,
+            )
+            self._bomb_window = bomb_window
+            self._bomb_resume_player = next_player if bomb_window else None
+            self._bomb_trick_finish = False
+            self._player_pos = bomb_window[0] if bomb_window else next_player
 
         # wish fullfilled?
         if played_comb.contains_cardrank(self.wish):

@@ -3,13 +3,21 @@ import pytest
 from gym_tichu.envs.internals.actions import (
     GiveDragonAwayAction,
     PassAction,
+    PassBombAction,
+    PlayBomb,
     PlayDog,
     PlayFirst,
     PlayCombination,
     Trick,
     WishAction,
 )
-from gym_tichu.envs.internals.cards import Card, CardRank, Single
+from gym_tichu.envs.internals.cards import (
+    Card,
+    CardRank,
+    Single,
+    SquareBomb,
+    Straight,
+)
 from gym_tichu.envs.internals.error import IllegalActionError
 
 
@@ -199,6 +207,32 @@ def test_dragon_trick_is_given_to_selected_opponent(state_factory):
     assert next_state.player_pos == 0
 
 
+def test_final_dragon_trick_is_still_given_to_selected_opponent(state_factory):
+    dragon_trick = Trick(
+        [PlayFirst(player_pos=0, combination=Single(Card.DRAGON))]
+    ).finish()
+    state = state_factory(
+        [
+            set(),
+            set(),
+            set(),
+            {Card.FIVE_JADE},
+        ],
+        player_pos=3,
+        ranking=(1, 2, 0),
+        trick_on_table=dragon_trick,
+    )
+
+    actions = state.possible_actions_list
+
+    assert len(actions) == 2
+    assert all(isinstance(action, GiveDragonAwayAction) for action in actions)
+    give_to_three = next(action for action in actions if action.to == 3)
+    terminal = state.next_state(give_to_three)
+    assert terminal.is_terminal()
+    assert terminal.won_tricks[3] == (dragon_trick,)
+
+
 def test_double_win_ends_round_and_scores_200_for_team(state_factory):
     state = state_factory(
         [
@@ -213,3 +247,215 @@ def test_double_win_ends_round_and_scores_200_for_team(state_factory):
     assert state.is_terminal()
     assert state.is_double_win()
     assert state.count_points() == (200, 0, 200, 0)
+
+
+def test_out_of_turn_square_bomb_interrupts_normal_player(state_factory):
+    fours = {
+        Card.FOUR_JADE,
+        Card.FOUR_HOUSE,
+        Card.FOUR_SWORD,
+        Card.FOUR_PAGODA,
+    }
+    state = state_factory(
+        [
+            {Card.TWO_JADE, Card.THREE_JADE},
+            {Card.SIX_JADE},
+            fours | {Card.SEVEN_JADE},
+            {Card.EIGHT_JADE},
+        ]
+    )
+
+    after_play = state.next_state(
+        PlayFirst(player_pos=0, combination=Single(Card.TWO_JADE))
+    )
+
+    assert after_play.player_pos == 2
+    assert after_play.bomb_window == (2,)
+    bomb_action = next(
+        action
+        for action in after_play.possible_actions_list
+        if isinstance(action, PlayBomb)
+    )
+    after_bomb = after_play.next_state(bomb_action)
+
+    assert after_bomb.trick_on_table.last_combination == SquareBomb(*fours)
+    assert not fours.intersection(after_bomb.handcards[2])
+    assert after_bomb.player_pos == 3
+
+
+def test_declining_async_bomb_restores_interrupted_turn(state_factory):
+    fours = {
+        Card.FOUR_JADE,
+        Card.FOUR_HOUSE,
+        Card.FOUR_SWORD,
+        Card.FOUR_PAGODA,
+    }
+    state = state_factory(
+        [
+            {Card.TWO_JADE, Card.THREE_JADE},
+            {Card.SIX_JADE},
+            fours | {Card.SEVEN_JADE},
+            {Card.EIGHT_JADE},
+        ]
+    )
+    bomb_window = state.next_state(
+        PlayFirst(player_pos=0, combination=Single(Card.TWO_JADE))
+    )
+
+    resumed = bomb_window.next_state(PassBombAction(player_pos=2))
+
+    assert resumed.bomb_window == ()
+    assert resumed.player_pos == 1
+    assert any(isinstance(action, PassAction) for action in resumed.possible_actions_list)
+
+
+def test_higher_async_bomb_can_rebomb(state_factory):
+    fours = {
+        Card.FOUR_JADE,
+        Card.FOUR_HOUSE,
+        Card.FOUR_SWORD,
+        Card.FOUR_PAGODA,
+    }
+    fives = {
+        Card.FIVE_JADE,
+        Card.FIVE_HOUSE,
+        Card.FIVE_SWORD,
+        Card.FIVE_PAGODA,
+    }
+    state = state_factory(
+        [
+            {Card.TWO_JADE, Card.THREE_JADE},
+            {Card.SIX_JADE},
+            fours | {Card.SEVEN_JADE},
+            fives | {Card.EIGHT_JADE},
+        ]
+    )
+    first_window = state.next_state(
+        PlayFirst(player_pos=0, combination=Single(Card.TWO_JADE))
+    )
+    first_bomb = next(
+        action
+        for action in first_window.possible_actions_list
+        if isinstance(action, PlayBomb) and action.player_pos == 2
+    )
+    second_window = first_window.next_state(first_bomb)
+    second_bomb = next(
+        action
+        for action in second_window.possible_actions_list
+        if isinstance(action, PlayBomb) and action.player_pos == 3
+    )
+
+    after_rebomb = second_window.next_state(second_bomb)
+
+    assert after_rebomb.trick_on_table.last_combination == SquareBomb(*fives)
+    assert after_rebomb.player_pos == 0
+
+
+def test_bomb_may_be_played_after_three_normal_passes(state_factory):
+    fours = {
+        Card.FOUR_JADE,
+        Card.FOUR_HOUSE,
+        Card.FOUR_SWORD,
+        Card.FOUR_PAGODA,
+    }
+    state = state_factory(
+        [
+            {Card.TWO_JADE, Card.THREE_JADE},
+            {Card.SIX_JADE},
+            fours | {Card.SEVEN_JADE},
+            {Card.EIGHT_JADE},
+        ]
+    )
+    state = state.next_state(
+        PlayFirst(player_pos=0, combination=Single(Card.TWO_JADE))
+    )
+    state = state.next_state(PassBombAction(player_pos=2))
+
+    state = state.next_state(PassAction(player_pos=1))
+    state = state.next_state(PassBombAction(player_pos=2))
+    state = state.next_state(PassAction(player_pos=2))
+    state = state.next_state(PassBombAction(player_pos=2))
+    state = state.next_state(PassAction(player_pos=3))
+
+    assert not state.trick_on_table.is_finished()
+    assert state.bomb_trick_finish is True
+    assert any(isinstance(action, PlayBomb) for action in state.possible_actions_list)
+
+    finished = state.next_state(PassBombAction(player_pos=2))
+
+    assert finished.trick_on_table.is_finished()
+    assert finished.player_pos == 0
+
+
+def test_late_bomb_starts_new_trick_without_stealing_completed_points(state_factory):
+    fours = {
+        Card.FOUR_JADE,
+        Card.FOUR_HOUSE,
+        Card.FOUR_SWORD,
+        Card.FOUR_PAGODA,
+    }
+    state = state_factory(
+        [
+            {Card.TEN_JADE},
+            {Card.SIX_JADE},
+            fours | {Card.SEVEN_JADE},
+            {Card.EIGHT_JADE},
+        ]
+    )
+    state = state.next_state(
+        PlayFirst(player_pos=0, combination=Single(Card.TEN_JADE))
+    )
+    state = state.next_state(PassBombAction(player_pos=2))
+    state = state.next_state(PassAction(player_pos=1))
+    state = state.next_state(PassBombAction(player_pos=2))
+    state = state.next_state(PassAction(player_pos=2))
+    state = state.next_state(PassBombAction(player_pos=2))
+    state = state.next_state(PassAction(player_pos=3))
+
+    bomb = next(
+        action for action in state.possible_actions_list if isinstance(action, PlayBomb)
+    )
+    after_bomb = state.next_state(bomb)
+
+    assert state.won_tricks[0][0].points == 10
+    assert after_bomb.won_tricks[0][0].points == 10
+    assert after_bomb.trick_on_table.last_combination == SquareBomb(*fours)
+
+
+def test_equal_natural_straight_is_not_mandatory_for_wish(state_factory):
+    phoenix_straight = Straight(
+        {
+            Card.FIVE_HOUSE,
+            Card.SIX_HOUSE,
+            Card.PHOENIX,
+            Card.EIGHT_JADE,
+            Card.NINE_SWORD,
+        },
+        phoenix_as=Card.SEVEN_SWORD,
+    )
+    state = state_factory(
+        [
+            {Card.TWO_JADE},
+            {
+                Card.FIVE_JADE,
+                Card.SIX_JADE,
+                Card.SEVEN_JADE,
+                Card.EIGHT_HOUSE,
+                Card.NINE_HOUSE,
+            },
+            {Card.THREE_JADE},
+            {Card.FOUR_JADE},
+        ],
+        player_pos=1,
+        trick_on_table=Trick(
+            [PlayFirst(player_pos=0, combination=phoenix_straight)]
+        ),
+        wish=CardRank.SEVEN,
+    )
+
+    assert any(isinstance(action, PassAction) for action in state.possible_actions_list)
+    assert any(
+        isinstance(action, PlayCombination)
+        and action.combination.contains_cardrank(CardRank.SEVEN)
+        for action in state.possible_actions_list
+    )

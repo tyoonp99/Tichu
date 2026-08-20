@@ -12,8 +12,8 @@ from .cards import Combination, DOG_COMBINATION, CardRank
 from .error import NotSupportedError
 
 __all__ = ("PlayerAction", "PlayCombination", "CardTrade", "TradeAction", "PlayFirst", "PlayDog", "PlayBomb",
-           "PassAction", "TichuAction", "WinTrickAction", "GiveDragonAwayAction", "WishAction",
-           "pass_actions", "tichu_actions", "no_tichu_actions", "play_dog_actions", "all_wish_actions_gen",
+           "PassAction", "PassBombAction", "TichuAction", "WinTrickAction", "GiveDragonAwayAction", "WishAction",
+           "pass_actions", "pass_bomb_actions", "tichu_actions", "no_tichu_actions", "play_dog_actions", "all_wish_actions_gen",
            "Trick", "FinishedTrick", "wishable_card_ranks")
 
 CardTrade = namedtuple('CardTrade', ['from_', 'to', 'card'])
@@ -92,6 +92,19 @@ class PassAction(PlayerAction):
 
     def __str__(self):
         return "PASS({me.player_pos})".format(me=self)
+
+
+class PassBombAction(PlayerAction):
+    """Decline an out-of-turn opportunity to play a bomb.
+
+    This is deliberately separate from :class:`PassAction`: declining a bomb
+    must not count as passing during the normal clockwise trick sequence.
+    """
+
+    __slots__ = ()
+
+    def __str__(self):
+        return "PASS_BOMB({me.player_pos})".format(me=self)
 
 
 class TichuAction(PlayerAction):
@@ -221,6 +234,7 @@ class TradeAction(PlayerAction, CardTrade):
 # ###### PREDEFINED ACTIONS ######
 # Pass
 pass_actions = tuple((PassAction(k) for k in range(4)))
+pass_bomb_actions = tuple((PassBombAction(k) for k in range(4)))
 
 # Tichu
 tichu_actions = tuple((TichuAction(k, True) for k in range(4)))

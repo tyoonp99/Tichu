@@ -24,6 +24,9 @@ def state_factory():
         won_tricks=None,
         allow_tichu=False,
         allow_wish=True,
+        bomb_window=(),
+        bomb_resume_player=None,
+        bomb_trick_finish=False,
     ):
         return TichuState(
             player_pos=player_pos,
@@ -35,6 +38,9 @@ def state_factory():
             announced_tichu=announced_tichu,
             announced_grand_tichu=announced_grand_tichu,
             history=history or History(),
+            bomb_window=bomb_window,
+            bomb_resume_player=bomb_resume_player,
+            bomb_trick_finish=bomb_trick_finish,
             allow_tichu=allow_tichu,
             allow_wish=allow_wish,
         )
