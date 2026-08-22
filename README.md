@@ -49,10 +49,10 @@ docker compose run --rm tests python collect_dataset.py \
   --record-agent fuegi-mcts \
   --games 100 \
   --seed 40000 \
-  --output-dir datasets/tichu-decisions-v1
+  --output-dir datasets/tichu-decisions-v2
 ```
 
-See [docs/training-dataset-v1.md](./docs/training-dataset-v1.md) for the schema
+See [docs/training-dataset-v2.md](./docs/training-dataset-v2.md) for the schema
 and privacy rules. Generated datasets are intentionally ignored by Git.
 
 The verified Brettspielwelt decisions can also train a supervised legal-action

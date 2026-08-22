@@ -78,7 +78,7 @@ def build_parser():
     parser.add_argument("--iterations", type=int, default=10)
     parser.add_argument("--max-time", type=float, default=0.2)
     parser.add_argument("--validation-fraction", type=float, default=0.1)
-    parser.add_argument("--output-dir", default="datasets/tichu-decisions-v1")
+    parser.add_argument("--output-dir", default="datasets/tichu-decisions-v2")
     return parser
 
 
@@ -126,4 +126,3 @@ def main(argv=None):
 
 if __name__ == "__main__":
     main()
-

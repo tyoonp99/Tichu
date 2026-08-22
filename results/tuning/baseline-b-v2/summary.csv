@@ -1,0 +1,5 @@
+candidate,hidden_size,learning_rate,dropout,status,best_epoch,validation_top1,validation_loss,validation_records,elapsed_seconds,checkpoint,error
+small-fast,64,0.001,0.0,completed,5,0.8690607483958657,0.35209657161500396,682767,3887.864403572,models/baseline-b-v2-tuning/small-fast.pt,
+base,128,0.0003,0.1,completed,5,0.8738779114983589,0.3377787467003051,682767,4030.5220127149996,models/baseline-b-v2-tuning/base.pt,
+wide,256,0.0003,0.1,completed,5,0.878506137525686,0.3236662635708179,682767,4530.037898285998,models/baseline-b-v2-tuning/wide.pt,
+regularized,128,0.001,0.2,completed,5,0.8714773854038054,0.34678092980109065,682767,4543.483774514001,models/baseline-b-v2-tuning/regularized.pt,

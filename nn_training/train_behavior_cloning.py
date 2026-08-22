@@ -23,6 +23,7 @@ from nn_training.imitation_features import (
     batches,
     buffered_shuffle,
     iter_jsonl,
+    resolve_jsonl_path,
 )
 
 
@@ -243,8 +244,8 @@ def main():
     torch.manual_seed(args.seed)
 
     data_dir = Path(args.data_dir)
-    train_path = data_dir / "train.jsonl"
-    validation_path = data_dir / "validation.jsonl"
+    train_path = resolve_jsonl_path(data_dir, "train")
+    validation_path = resolve_jsonl_path(data_dir, "validation")
     schema = FeatureSchema.from_jsonl(
         train_path, max_trick_actions=args.max_trick_actions
     )

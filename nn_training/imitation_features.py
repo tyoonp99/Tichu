@@ -7,6 +7,7 @@ inference code.
 
 from __future__ import annotations
 
+import gzip
 import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -28,6 +29,7 @@ class FeatureSchema:
     combinations: tuple[str, ...]
     wishes: tuple[str, ...]
     max_trick_actions: int = 12
+    record_schema_version: int = 1
 
     @classmethod
     def from_records(
@@ -37,6 +39,7 @@ class FeatureSchema:
         action_types: set[str] = set()
         combinations: set[str] = set()
         wishes: set[str] = set()
+        record_schema_version = 1
 
         def observe_action(action: Mapping) -> None:
             action_types.add(action.get("type", "UNKNOWN"))
@@ -47,6 +50,9 @@ class FeatureSchema:
                 wishes.add(wish)
 
         for record in records:
+            record_schema_version = max(
+                record_schema_version, int(record.get("schema_version", 1))
+            )
             observation = record["observation"]
             cards.update(observation.get("hand", ()))
             wish = observation.get("wish")
@@ -64,6 +70,7 @@ class FeatureSchema:
             combinations=_sorted_values(combinations),
             wishes=_sorted_values(wishes),
             max_trick_actions=max_trick_actions,
+            record_schema_version=record_schema_version,
         )
 
     @classmethod
@@ -80,6 +87,7 @@ class FeatureSchema:
             combinations=tuple(value["combinations"]),
             wishes=tuple(value["wishes"]),
             max_trick_actions=int(value["max_trick_actions"]),
+            record_schema_version=int(value.get("record_schema_version", 1)),
         )
 
     def to_dict(self) -> dict:
@@ -87,7 +95,9 @@ class FeatureSchema:
 
 
 def iter_jsonl(path: str | Path) -> Iterator[dict]:
-    with Path(path).open(encoding="utf-8") as source:
+    path = Path(path)
+    opener = gzip.open if path.suffix == ".gz" else Path.open
+    with opener(path, mode="rt", encoding="utf-8") as source:
         for line_number, line in enumerate(source, start=1):
             if not line.strip():
                 continue
@@ -95,6 +105,23 @@ def iter_jsonl(path: str | Path) -> Iterator[dict]:
                 yield json.loads(line)
             except json.JSONDecodeError as error:
                 raise ValueError(f"invalid JSONL at {path}:{line_number}") from error
+
+
+def resolve_jsonl_path(data_dir: str | Path, split: str) -> Path:
+    """Prefer the compressed canonical dataset and retain v1 compatibility."""
+    data_dir = Path(data_dir)
+    candidates = (
+        data_dir / "{}.jsonl.gz".format(split),
+        data_dir / "{}.jsonl".format(split),
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    raise FileNotFoundError(
+        "missing {} split in {} (expected {} or {})".format(
+            split, data_dir, candidates[0].name, candidates[1].name
+        )
+    )
 
 
 class FeatureEncoder:
@@ -134,6 +161,8 @@ class FeatureEncoder:
             + 4  # announced tichu
             + 4  # announced grand tichu
         )
+        if schema.record_schema_version >= 2:
+            public_size += 7  # bomb response, resume player/none, trick finish
         self.state_size = public_size + schema.max_trick_actions * self.action_size
 
     @staticmethod
@@ -210,6 +239,23 @@ class FeatureEncoder:
                     vector, offset, position if position in range(4) else None
                 )
             offset += 4
+
+        if self.schema.record_schema_version >= 2:
+            vector[offset] = float(
+                observation.get("decision_context") == "bomb_response"
+            )
+            offset += 1
+            resume_player = observation.get("bomb_resume_player")
+            self._one_hot(
+                vector,
+                offset,
+                resume_player if resume_player in range(4) else None,
+            )
+            offset += 4
+            vector[offset] = float(resume_player is None)
+            offset += 1
+            vector[offset] = float(bool(observation.get("bomb_trick_finish", False)))
+            offset += 1
 
         trick = observation.get("trick", ())[-self.schema.max_trick_actions :]
         # Right-align so the newest public actions always occupy the same slots.

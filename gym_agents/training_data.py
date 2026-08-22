@@ -7,6 +7,7 @@ from pathlib import Path
 from gym_tichu.envs.internals import (
     GiveDragonAwayAction,
     PassAction,
+    PassBombAction,
     PlayCombination,
     TichuAction,
     WinTrickAction,
@@ -14,7 +15,7 @@ from gym_tichu.envs.internals import (
 )
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 
 def _relative_position(position, observer):
@@ -48,7 +49,7 @@ def encode_action(action, observer):
         encoded["trick_points"] = action.trick.points
     elif isinstance(action, WinTrickAction):
         encoded["trick_points"] = action.trick.points
-    elif not isinstance(action, PassAction):
+    elif not isinstance(action, (PassAction, PassBombAction)):
         encoded["display"] = str(action)
     return encoded
 
@@ -62,6 +63,7 @@ def encode_observation(state, observer):
     and left opponent.
     """
     positions = [(observer + offset) % 4 for offset in range(4)]
+    bomb_resume_player = state.bomb_resume_player
     return {
         "hand": _card_names(state.handcards[observer]),
         "hand_sizes": [len(state.handcards[position]) for position in positions],
@@ -80,6 +82,16 @@ def encode_observation(state, observer):
             _relative_position(position, observer)
             for position in state.announced_grand_tichu
         ),
+        # Do not serialize the complete bomb_window: it is derived from every
+        # player's hidden hand and would leak who else owns a bomb.  These
+        # fields contain only the public decision context needed by the actor.
+        "decision_context": "bomb_response" if state.bomb_window else "normal",
+        "bomb_resume_player": (
+            _relative_position(bomb_resume_player, observer)
+            if bomb_resume_player is not None
+            else None
+        ),
+        "bomb_trick_finish": bool(state.bomb_trick_finish),
     }
 
 
@@ -199,4 +211,3 @@ def write_jsonl(path, records):
         for record in records:
             output.write(json.dumps(record, ensure_ascii=False, sort_keys=True))
             output.write("\n")
-

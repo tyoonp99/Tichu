@@ -1,0 +1,3 @@
+seed,swapped,team_a,team_b,team_a_points,team_b_points,point_diff,winner,rounds,elapsed_seconds,mcts_search_calls,mcts_iterations_requested,mcts_iterations_completed,mcts_average_iterations,mcts_time_limit_hits,mcts_iteration_limit_hits,mcts_search_seconds,game
+60000,False,model-c,fuegi,155,45,110,A,2,0.447053,0,0,0,0,0,0,0,0
+60000,True,model-c,fuegi,200,0,200,A,1,0.077315,0,0,0,0,0,0,0,0

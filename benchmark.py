@@ -14,6 +14,8 @@ from gym_agents import (
     BehaviorCloningAgent,
     FuegiHeuristicAgent,
     FuegiMctsAgent,
+    ModelCAgent,
+    ModelCGuidedMctsAgent,
     RandomAgent,
 )
 from gym_agents.mcts import make_default_ismctsearch, make_fuegi_ismctsearch
@@ -26,6 +28,8 @@ AGENT_NAMES = (
     "mcts",
     "fuegi-mcts",
     "behavior-cloning",
+    "model-c",
+    "model-c-guided-mcts",
 )
 
 
@@ -36,6 +40,9 @@ def make_agent(
     max_time=0.2,
     bc_checkpoint="models/behavior-cloning-v1.pt",
     bc_device="cpu",
+    model_c_checkpoint="models/model-c-v2/model-c.pt",
+    model_c_device="cpu",
+    puct_constant=1.25,
 ):
     if name == "random":
         return RandomAgent()
@@ -61,6 +68,17 @@ def make_agent(
         )
     if name == "behavior-cloning":
         return BehaviorCloningAgent(bc_checkpoint, device=bc_device)
+    if name == "model-c":
+        return ModelCAgent(model_c_checkpoint, device=model_c_device)
+    if name == "model-c-guided-mcts":
+        return ModelCGuidedMctsAgent(
+            model_c_checkpoint,
+            iterations=iterations,
+            max_time=max_time,
+            cheat=False,
+            device=model_c_device,
+            puct_constant=puct_constant,
+        )
     raise ValueError("Unknown agent: {}".format(name))
 
 
@@ -75,16 +93,19 @@ def play_game(
     max_time=0.2,
     bc_checkpoint="models/behavior-cloning-v1.pt",
     bc_device="cpu",
+    model_c_checkpoint="models/model-c-v2/model-c.pt",
+    model_c_device="cpu",
+    puct_constant=1.25,
 ):
     # The environment has its own seed, while MCTS determinizations, rollouts,
     # and random agents use Python's module-level RNG.
     random.seed(seed)
     even_team, odd_team = (team_b, team_a) if swap_seats else (team_a, team_b)
     agents = [
-        make_agent(even_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device),
-        make_agent(odd_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device),
-        make_agent(even_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device),
-        make_agent(odd_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device),
+        make_agent(even_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device, model_c_checkpoint=model_c_checkpoint, model_c_device=model_c_device, puct_constant=puct_constant),
+        make_agent(odd_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device, model_c_checkpoint=model_c_checkpoint, model_c_device=model_c_device, puct_constant=puct_constant),
+        make_agent(even_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device, model_c_checkpoint=model_c_checkpoint, model_c_device=model_c_device, puct_constant=puct_constant),
+        make_agent(odd_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device, model_c_checkpoint=model_c_checkpoint, model_c_device=model_c_device, puct_constant=puct_constant),
     ]
     game = TichuGame(*agents)
     started = perf_counter()
@@ -154,6 +175,9 @@ def run_benchmark(
     max_time=0.2,
     bc_checkpoint="models/behavior-cloning-v1.pt",
     bc_device="cpu",
+    model_c_checkpoint="models/model-c-v2/model-c.pt",
+    model_c_device="cpu",
+    puct_constant=1.25,
     show_progress=False,
 ):
     results = []
@@ -173,6 +197,9 @@ def run_benchmark(
                 max_time=max_time,
                 bc_checkpoint=bc_checkpoint,
                 bc_device=bc_device,
+                model_c_checkpoint=model_c_checkpoint,
+                model_c_device=model_c_device,
+                puct_constant=puct_constant,
             )
             result["game"] = game_number
             results.append(result)
@@ -257,6 +284,13 @@ def build_parser():
     parser.add_argument(
         "--bc-device", choices=("cpu", "cuda", "auto"), default="cpu"
     )
+    parser.add_argument(
+        "--model-c-checkpoint", default="models/model-c-v2/model-c.pt"
+    )
+    parser.add_argument(
+        "--model-c-device", choices=("cpu", "cuda", "auto"), default="cpu"
+    )
+    parser.add_argument("--puct-c", type=float, default=1.25, dest="puct_constant")
     parser.add_argument("--output", default="benchmark-results.csv")
     return parser
 
@@ -273,6 +307,9 @@ def main(argv=None):
         max_time=args.max_time,
         bc_checkpoint=args.bc_checkpoint,
         bc_device=args.bc_device,
+        model_c_checkpoint=args.model_c_checkpoint,
+        model_c_device=args.model_c_device,
+        puct_constant=args.puct_constant,
         show_progress=True,
     )
     write_csv(results, args.output)

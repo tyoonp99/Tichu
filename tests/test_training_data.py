@@ -6,6 +6,7 @@ from collect_dataset import build_parser
 from gym_agents import BaseMonteCarloAgent, DefaultGymAgent
 from gym_agents.mcts import make_fuegi_ismctsearch
 from gym_agents.training_data import (
+    SCHEMA_VERSION,
     DecisionRecorder,
     RecordingAgent,
     encode_observation,
@@ -35,6 +36,31 @@ def test_observation_contains_only_the_acting_players_cards(state_factory):
     assert "PHOENIX" not in serialized
     assert "MAHJONG" not in serialized
     assert "history" not in observation
+
+
+def test_rules_v2_observation_exposes_bomb_context_without_hidden_queue(
+    state_factory,
+):
+    state = state_factory(
+        [
+            {Card.TWO_JADE},
+            {Card.THREE_JADE},
+            {Card.FOUR_JADE},
+            {Card.FIVE_JADE},
+        ],
+        player_pos=1,
+        bomb_window=(1, 3),
+        bomb_resume_player=0,
+        bomb_trick_finish=True,
+    )
+
+    observation = encode_observation(state, observer=1)
+
+    assert SCHEMA_VERSION == 2
+    assert observation["decision_context"] == "bomb_response"
+    assert observation["bomb_resume_player"] == 3
+    assert observation["bomb_trick_finish"] is True
+    assert "bomb_window" not in observation
 
 
 def test_recording_agent_records_legal_choice_and_final_team_result(state_factory):
@@ -112,4 +138,4 @@ def test_dataset_parser_defaults_to_fuegi_mcts_teacher():
     assert args.team_a == "fuegi-mcts"
     assert args.team_b == "fuegi"
     assert args.record_agent == "fuegi-mcts"
-    assert args.output_dir == "datasets/tichu-decisions-v1"
+    assert args.output_dir == "datasets/tichu-decisions-v2"

@@ -16,6 +16,7 @@ services:
     working_dir: /app
     volumes:
       - .:/app
+    shm_size: 1gb
     environment:
       PYTHONHASHSEED: "0"
     deploy:

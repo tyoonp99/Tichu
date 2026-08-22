@@ -1,0 +1,91 @@
+{
+  "candidates": [
+    {
+      "best_epoch": 12,
+      "candidate": "wide-lr-low",
+      "checkpoint": "models/baseline-b-v2-refine/wide-lr-low.pt",
+      "dropout": 0.1,
+      "elapsed_seconds": 9240.88936509,
+      "error": null,
+      "hidden_size": 256,
+      "learning_rate": 0.0001,
+      "status": "completed",
+      "validation_loss": 0.3196911766404501,
+      "validation_records": 682767,
+      "validation_top1": 0.8801684908614505
+    },
+    {
+      "best_epoch": 12,
+      "candidate": "wide",
+      "checkpoint": "models/baseline-b-v2-refine/wide.pt",
+      "dropout": 0.1,
+      "elapsed_seconds": 9339.041336692002,
+      "error": null,
+      "hidden_size": 256,
+      "learning_rate": 0.0003,
+      "status": "completed",
+      "validation_loss": 0.31565448148203507,
+      "validation_records": 682767,
+      "validation_top1": 0.881145398064054
+    },
+    {
+      "best_epoch": 11,
+      "candidate": "wide-lr-high",
+      "checkpoint": "models/baseline-b-v2-refine/wide-lr-high.pt",
+      "dropout": 0.1,
+      "elapsed_seconds": 9433.960610474001,
+      "error": null,
+      "hidden_size": 256,
+      "learning_rate": 0.0006,
+      "status": "completed",
+      "validation_loss": 0.3199270795337363,
+      "validation_records": 682767,
+      "validation_top1": 0.88030030742552
+    }
+  ],
+  "config": {
+    "batch_size": 256,
+    "candidates": [
+      {
+        "dropout": 0.1,
+        "hidden_size": 256,
+        "learning_rate": 0.0001,
+        "name": "wide-lr-low"
+      },
+      {
+        "dropout": 0.1,
+        "hidden_size": 256,
+        "learning_rate": 0.0003,
+        "name": "wide"
+      },
+      {
+        "dropout": 0.1,
+        "hidden_size": 256,
+        "learning_rate": 0.0006,
+        "name": "wide-lr-high"
+      }
+    ],
+    "data_dir": "datasets/processed/brettspielwelt-decisions-v2",
+    "device": "cuda",
+    "early_stopping_patience": 2,
+    "epochs": 12,
+    "max_train_batches": null,
+    "max_validation_batches": null,
+    "schema_records": null
+  },
+  "format_version": 1,
+  "winner": {
+    "best_epoch": 12,
+    "candidate": "wide",
+    "checkpoint": "models/baseline-b-v2-refine/wide.pt",
+    "dropout": 0.1,
+    "elapsed_seconds": 9339.041336692002,
+    "error": null,
+    "hidden_size": 256,
+    "learning_rate": 0.0003,
+    "status": "completed",
+    "validation_loss": 0.31565448148203507,
+    "validation_records": 682767,
+    "validation_top1": 0.881145398064054
+  }
+}

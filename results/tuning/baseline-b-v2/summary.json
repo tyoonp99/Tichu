@@ -1,0 +1,110 @@
+{
+  "candidates": [
+    {
+      "best_epoch": 5,
+      "candidate": "small-fast",
+      "checkpoint": "models/baseline-b-v2-tuning/small-fast.pt",
+      "dropout": 0.0,
+      "elapsed_seconds": 3887.864403572,
+      "error": null,
+      "hidden_size": 64,
+      "learning_rate": 0.001,
+      "status": "completed",
+      "validation_loss": 0.35209657161500396,
+      "validation_records": 682767,
+      "validation_top1": 0.8690607483958657
+    },
+    {
+      "best_epoch": 5,
+      "candidate": "base",
+      "checkpoint": "models/baseline-b-v2-tuning/base.pt",
+      "dropout": 0.1,
+      "elapsed_seconds": 4030.5220127149996,
+      "error": null,
+      "hidden_size": 128,
+      "learning_rate": 0.0003,
+      "status": "completed",
+      "validation_loss": 0.3377787467003051,
+      "validation_records": 682767,
+      "validation_top1": 0.8738779114983589
+    },
+    {
+      "best_epoch": 5,
+      "candidate": "wide",
+      "checkpoint": "models/baseline-b-v2-tuning/wide.pt",
+      "dropout": 0.1,
+      "elapsed_seconds": 4530.037898285998,
+      "error": null,
+      "hidden_size": 256,
+      "learning_rate": 0.0003,
+      "status": "completed",
+      "validation_loss": 0.3236662635708179,
+      "validation_records": 682767,
+      "validation_top1": 0.878506137525686
+    },
+    {
+      "best_epoch": 5,
+      "candidate": "regularized",
+      "checkpoint": "models/baseline-b-v2-tuning/regularized.pt",
+      "dropout": 0.2,
+      "elapsed_seconds": 4543.483774514001,
+      "error": null,
+      "hidden_size": 128,
+      "learning_rate": 0.001,
+      "status": "completed",
+      "validation_loss": 0.34678092980109065,
+      "validation_records": 682767,
+      "validation_top1": 0.8714773854038054
+    }
+  ],
+  "config": {
+    "batch_size": 256,
+    "candidates": [
+      {
+        "dropout": 0.0,
+        "hidden_size": 64,
+        "learning_rate": 0.001,
+        "name": "small-fast"
+      },
+      {
+        "dropout": 0.1,
+        "hidden_size": 128,
+        "learning_rate": 0.0003,
+        "name": "base"
+      },
+      {
+        "dropout": 0.1,
+        "hidden_size": 256,
+        "learning_rate": 0.0003,
+        "name": "wide"
+      },
+      {
+        "dropout": 0.2,
+        "hidden_size": 128,
+        "learning_rate": 0.001,
+        "name": "regularized"
+      }
+    ],
+    "data_dir": "datasets/processed/brettspielwelt-decisions-v2",
+    "device": "cuda",
+    "epochs": 5,
+    "max_train_batches": null,
+    "max_validation_batches": null,
+    "schema_records": null
+  },
+  "format_version": 1,
+  "winner": {
+    "best_epoch": 5,
+    "candidate": "wide",
+    "checkpoint": "models/baseline-b-v2-tuning/wide.pt",
+    "dropout": 0.1,
+    "elapsed_seconds": 4530.037898285998,
+    "error": null,
+    "hidden_size": 256,
+    "learning_rate": 0.0003,
+    "status": "completed",
+    "validation_loss": 0.3236662635708179,
+    "validation_records": 682767,
+    "validation_top1": 0.878506137525686
+  }
+}

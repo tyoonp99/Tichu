@@ -1,0 +1,4 @@
+candidate,hidden_size,learning_rate,dropout,status,best_epoch,validation_top1,validation_loss,validation_records,elapsed_seconds,checkpoint,error
+wide-lr-low,256,0.0001,0.1,completed,12,0.8801684908614505,0.3196911766404501,682767,9240.88936509,models/baseline-b-v2-refine/wide-lr-low.pt,
+wide,256,0.0003,0.1,completed,12,0.881145398064054,0.31565448148203507,682767,9339.041336692002,models/baseline-b-v2-refine/wide.pt,
+wide-lr-high,256,0.0006,0.1,completed,11,0.88030030742552,0.3199270795337363,682767,9433.960610474001,models/baseline-b-v2-refine/wide-lr-high.pt,

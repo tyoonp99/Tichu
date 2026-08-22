@@ -1,3 +1,4 @@
+import gzip
 import json
 
 import numpy as np
@@ -8,6 +9,7 @@ from nn_training.imitation_features import (
     FeatureSchema,
     buffered_shuffle,
     iter_jsonl,
+    resolve_jsonl_path,
 )
 
 
@@ -51,6 +53,50 @@ def test_schema_and_encoder_keep_chosen_action_index():
     assert np.isfinite(candidates).all()
 
 
+def test_schema_v2_encodes_public_bomb_response_context():
+    normal = sample_record()
+    normal["schema_version"] = 2
+    normal["observation"].update(
+        {
+            "decision_context": "normal",
+            "bomb_resume_player": None,
+            "bomb_trick_finish": False,
+        }
+    )
+    bomb = sample_record()
+    bomb["schema_version"] = 2
+    bomb["observation"].update(
+        {
+            "decision_context": "bomb_response",
+            "bomb_resume_player": 2,
+            "bomb_trick_finish": True,
+        }
+    )
+    schema = FeatureSchema.from_records([normal, bomb], max_trick_actions=3)
+    encoder = FeatureEncoder(schema)
+
+    normal_vector = encoder.encode_observation(normal["observation"])
+    bomb_vector = encoder.encode_observation(bomb["observation"])
+
+    assert schema.record_schema_version == 2
+    assert normal_vector.shape == bomb_vector.shape
+    assert not np.array_equal(normal_vector, bomb_vector)
+
+
+def test_old_feature_schema_defaults_to_record_version_one():
+    schema = FeatureSchema.from_dict(
+        {
+            "cards": [],
+            "action_types": [],
+            "combinations": [],
+            "wishes": [],
+            "max_trick_actions": 12,
+        }
+    )
+
+    assert schema.record_schema_version == 1
+
+
 def test_trick_history_is_right_aligned_and_order_sensitive():
     record = sample_record()
     schema = FeatureSchema.from_records([record], max_trick_actions=2)
@@ -92,6 +138,20 @@ def test_jsonl_reader_reports_bad_line(tmp_path):
     assert next(records)["chosen_action"]["type"] == "PlayCombination"
     with pytest.raises(ValueError, match=":2"):
         next(records)
+
+
+def test_jsonl_reader_and_resolver_support_gzip(tmp_path):
+    path = tmp_path / "train.jsonl.gz"
+    with gzip.open(path, "wt", encoding="utf-8") as output:
+        output.write(json.dumps(sample_record()) + "\n")
+
+    assert resolve_jsonl_path(tmp_path, "train") == path
+    assert list(iter_jsonl(path))[0]["chosen_action"]["type"] == "PlayCombination"
+
+
+def test_jsonl_resolver_reports_missing_split(tmp_path):
+    with pytest.raises(FileNotFoundError, match="validation"):
+        resolve_jsonl_path(tmp_path, "validation")
 
 
 def test_buffered_shuffle_preserves_all_records():

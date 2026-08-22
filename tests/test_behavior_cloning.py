@@ -5,9 +5,11 @@ import pytest
 torch = pytest.importorskip("torch")
 
 from nn_training.behavior_cloning import (  # noqa: E402
+    BaselineBPolicy,
     CandidatePolicy,
     batch_loss_and_rankings,
     encode_batch,
+    encode_padded_batch,
 )
 from nn_training.imitation_features import FeatureEncoder, FeatureSchema  # noqa: E402
 from nn_training.train_behavior_cloning import run_epoch  # noqa: E402
@@ -61,6 +63,31 @@ def test_candidate_policy_scores_every_legal_action_and_backpropagates():
     assert len(predictions) == 2
     assert len(targets) == 2
     assert sum(top3_matches) == 2
+    assert any(parameter.grad is not None for parameter in model.parameters())
+
+
+def test_baseline_b_returns_padded_logits_and_masks_non_candidates():
+    records = [sample_record(), sample_record()]
+    records[1]["legal_actions"] = records[1]["legal_actions"][:1]
+    records[1]["chosen_action"] = records[1]["legal_actions"][0]
+    encoder = FeatureEncoder(FeatureSchema.from_records(records))
+    batch = encode_padded_batch(records, encoder)
+    model = BaselineBPolicy(
+        state_size=encoder.state_size,
+        action_size=encoder.action_size,
+        hidden_size=16,
+        dropout=0,
+    )
+
+    logits = model(batch)
+    loss = torch.nn.functional.cross_entropy(logits, batch.targets)
+    loss.backward()
+
+    assert logits.shape == (2, 2)
+    assert batch.legal_action_mask.tolist() == [[True, True], [True, False]]
+    assert torch.isfinite(logits[batch.legal_action_mask]).all()
+    assert torch.isneginf(logits[~batch.legal_action_mask]).all()
+    assert torch.isfinite(loss)
     assert any(parameter.grad is not None for parameter in model.parameters())
 
 

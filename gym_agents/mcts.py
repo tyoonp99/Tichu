@@ -561,6 +561,69 @@ class FuegiUCBTreePolicy(UCBTreePolicy, metaclass=abc.ABCMeta):
         return max(scored_actions, key=lambda scored: scored.total).action
 
 
+class PUCTTreePolicy(UCBTreePolicy, metaclass=abc.ABCMeta):
+    """PUCT selection using a policy prior supplied by the owning search."""
+
+    puct_constant = 1.25
+
+    def set_action_prior(self, action_prior, *, puct_constant=1.25):
+        self._action_prior = action_prior
+        self.puct_constant = puct_constant
+        self._prior_cache = {}
+
+    def clear_prior_cache(self):
+        self._prior_cache.clear()
+
+    def _priors_for(self, state, actions):
+        action_names = tuple(sorted(map(repr, actions)))
+        key = (unique_infoset_id(state, state.player_pos), action_names)
+        cached = self._prior_cache.get(key)
+        if cached is None:
+            computed = self._action_prior(state, actions=actions)
+            cached = {repr(action): value for action, value in computed.items()}
+            self._prior_cache[key] = cached
+        return {action: cached.get(repr(action), 0.0) for action in actions}
+
+    def tree_selection(self, state: TichuState) -> PlayerAction:
+        nid = self.graph_node_id(state)
+        possible_actions = state.possible_actions_set
+        actions_and_records = []
+        for _, to_nid, action in self.graph.out_edges(
+            nbunch=[nid], data="action", default=None
+        ):
+            if action in possible_actions:
+                record = self.graph.nodes[to_nid]["record"]
+                self._available_records.add(record)
+                actions_and_records.append((action, record))
+        if not actions_and_records:
+            raise RuntimeError("PUCT selection requires expanded legal actions")
+
+        priors = self._priors_for(
+            state, [action for action, _ in actions_and_records]
+        )
+        parent_visits = max(1, self._record_for_state(state).visit_count)
+        best_action = None
+        best_key = None
+        for action, record in actions_and_records:
+            mean_value = (
+                record.total_reward[state.player_pos] / record.visit_count
+                if record.visit_count else 0.0
+            )
+            exploration = (
+                self.puct_constant
+                * priors.get(action, 0.0)
+                * sqrt(parent_visits)
+                / (1 + record.visit_count)
+            )
+            # repr makes equal values deterministic, while the prior breaks
+            # the all-unvisited tie in favor of Model C.
+            key = (mean_value + exploration, priors.get(action, 0.0), repr(action))
+            if best_key is None or key > best_key:
+                best_key = key
+                best_action = action
+        return best_action
+
+
 class NoRolloutPolicy(UCBTreePolicy, metaclass=abc.ABCMeta):
     """
     The treepolicy returns a terminal state and therefore no rollout is performed.
@@ -917,6 +980,26 @@ def make_fuegi_ismctsearch(name: str, nodeidpolicy=DefaultNodeIdPolicy, determin
                            treepolicy=FuegiUCBTreePolicy, rolloutpolicy=FuegiRolloutPolicy,
                            evaluationpolicy=TeamPointDifferenceEvaluationPolicy,
                            bestactionpolicy=FuegiBestActionPolicy, ret_class: bool=False):
+    return make_ismctsearch(
+        name=name,
+        nodeidpolicy=nodeidpolicy,
+        determinizationpolicy=determinizationpolicy,
+        treepolicy=treepolicy,
+        rolloutpolicy=rolloutpolicy,
+        evaluationpolicy=evaluationpolicy,
+        bestactionpolicy=bestactionpolicy,
+        ret_class=ret_class,
+    )
+
+
+def make_model_c_puct_ismctsearch(name: str, nodeidpolicy=DefaultNodeIdPolicy,
+                                  determinizationpolicy=RandomDeterminePolicy,
+                                  treepolicy=PUCTTreePolicy,
+                                  rolloutpolicy=FuegiRolloutPolicy,
+                                  evaluationpolicy=TeamPointDifferenceEvaluationPolicy,
+                                  bestactionpolicy=MostVisitedBestActionPolicy,
+                                  ret_class: bool=False):
+    """Make an ISMCTS whose selection prior is attached after construction."""
     return make_ismctsearch(
         name=name,
         nodeidpolicy=nodeidpolicy,

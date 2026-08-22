@@ -115,7 +115,7 @@ def _action_kind(actions):
     return "play"
 
 
-def _prepare_for_event(state, event=None):
+def _prepare_for_event(state, event=None, inferred_decisions=None):
     """Apply engine-only administrative actions omitted from text logs."""
     event_kind = event.kind if event is not None else "end"
     while not state.is_terminal():
@@ -145,6 +145,8 @@ def _prepare_for_event(state, event=None):
             decline = next(
                 action for action in actions if isinstance(action, PassBombAction)
             )
+            if inferred_decisions is not None:
+                inferred_decisions.append((state, None, decline))
             state = state.next_state(decline)
             continue
         break
@@ -266,7 +268,7 @@ def canonical_action(state, action):
     return None
 
 
-def replay_round(round_):
+def replay_round(round_, *, include_inferred_bomb_passes=False):
     """Replay one round and report the first incompatibility, if any."""
     if round_.scores is None:
         return ReplayResult(status="incomplete_round")
@@ -279,10 +281,18 @@ def replay_round(round_):
     except Exception as error:
         return ReplayResult(status="setup_error", detail=str(error))
 
-    return _replay_from_event(round_, state, 0, [])
+    return _replay_from_event(
+        round_,
+        state,
+        0,
+        [],
+        include_inferred_bomb_passes=include_inferred_bomb_passes,
+    )
 
 
-def _replay_from_event(round_, state, start_index, decisions):
+def _replay_from_event(
+    round_, state, start_index, decisions, *, include_inferred_bomb_passes=False
+):
     """Replay events, branching only when a logged Phoenix role is ambiguous."""
 
     ignored = {"grand_tichu", "tichu", "bomb_notice"}
@@ -300,7 +310,11 @@ def _replay_from_event(round_, state, start_index, decisions):
                 # BSW explicitly records the leading player's final pass.  In
                 # this engine the trick has already finished at that point.
                 continue
-            state = _prepare_for_event(state, event)
+            state = _prepare_for_event(
+                state,
+                event,
+                decisions if include_inferred_bomb_passes else None,
+            )
             pending_kind = _action_kind(state.possible_actions_list)
             if (
                 event.kind == "pass"
@@ -362,7 +376,11 @@ def _replay_from_event(round_, state, start_index, decisions):
                         continue
                     branch_results.append(
                         _replay_from_event(
-                            round_, branch_state, event_index + 1, branch_decisions
+                            round_,
+                            branch_state,
+                            event_index + 1,
+                            branch_decisions,
+                            include_inferred_bomb_passes=include_inferred_bomb_passes,
                         )
                     )
 
@@ -380,7 +398,12 @@ def _replay_from_event(round_, state, start_index, decisions):
             )
 
     try:
-        state = _prepare_for_event(state)
+        state = _prepare_for_event(
+            state,
+            inferred_decisions=(
+                decisions if include_inferred_bomb_passes else None
+            ),
+        )
         if not state.is_terminal():
             return ReplayResult(
                 status="not_terminal",
@@ -508,7 +531,7 @@ def main():
     parser = argparse.ArgumentParser(description="Replay Brettspielwelt logs locally")
     parser.add_argument("--input-dir", default="datasets/raw/brettspielwelt")
     parser.add_argument(
-        "--report", default="datasets/processed/brettspielwelt-replay-report.jsonl"
+        "--report", default="datasets/processed/brettspielwelt-replay-report-v2.jsonl"
     )
     parser.add_argument("--workers", type=int, default=1)
     args = parser.parse_args()

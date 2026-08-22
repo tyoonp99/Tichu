@@ -1,5 +1,5 @@
 from benchmark import build_parser, make_agent, play_game, run_benchmark, summarize
-from gym_agents import FuegiHeuristicAgent, FuegiMctsAgent
+from gym_agents import FuegiHeuristicAgent, FuegiMctsAgent, ModelCAgent, ModelCGuidedMctsAgent
 
 
 def test_benchmark_parser_configures_paired_matches():
@@ -22,6 +22,9 @@ def test_benchmark_parser_configures_paired_matches():
     assert args.seed == 42
     assert args.bc_checkpoint == "models/behavior-cloning-v1.pt"
     assert args.bc_device == "cpu"
+    assert args.model_c_checkpoint == "models/model-c-v2/model-c.pt"
+    assert args.model_c_device == "cpu"
+    assert args.puct_constant == 1.25
 
 
 def test_benchmark_can_create_fuegi_agent():

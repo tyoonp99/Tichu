@@ -115,3 +115,40 @@ MCTS가 포함된 벤치마크 CSV와 요약에는 실제 탐색량도 기록됩
 ```powershell
 --iterations 100000 --max-time 0.2
 ```
+
+## Baseline B 후보 튜닝
+
+nn_training/tune_baseline_b.py는 v2 train/validation 분할만 사용해 네 MLP 후보를
+차례로 학습한다. test 분할은 읽지 않는다.
+
+| 후보 | Hidden size | Learning rate | Dropout |
+| --- | ---: | ---: | ---: |
+| small-fast | 64 | 0.001 | 0.0 |
+| base | 128 | 0.0003 | 0.1 |
+| wide | 256 | 0.0003 | 0.1 |
+| regularized | 128 | 0.001 | 0.2 |
+
+~~~powershell
+docker compose run --rm --entrypoint python train-bc `
+  nn_training/tune_baseline_b.py `
+  --device cuda `
+  --epochs 5 `
+  --batch-size 256
+~~~
+
+각 후보는 validation Top-1을 우선으로, 동률이면 validation loss가 더 낮은 epoch를
+checkpoint로 저장한다. 실행 중에는 매 후보 뒤에 다음 파일이 갱신된다.
+
+- results/tuning/baseline-b-v2/summary.json
+- results/tuning/baseline-b-v2/summary.csv
+
+먼저 파이프라인만 확인하려면 전체 feature schema와 전체 epoch 대신 작은 표본을 쓴다.
+
+~~~powershell
+docker compose run --rm --entrypoint python train-bc `
+  nn_training/tune_baseline_b.py `
+  --device cuda `
+  --dry-run `
+  --output-dir results/tuning/baseline-b-v2-smoke `
+  --model-dir models/baseline-b-v2-tuning-smoke
+~~~
