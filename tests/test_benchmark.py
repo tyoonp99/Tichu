@@ -22,9 +22,12 @@ def test_benchmark_parser_configures_paired_matches():
     assert args.seed == 42
     assert args.bc_checkpoint == "models/behavior-cloning-v1.pt"
     assert args.bc_device == "cpu"
+    assert args.baseline_b_checkpoint == "models/archive/baseline-b-v2/refine/wide.pt"
+    assert args.baseline_b_device == "cpu"
     assert args.model_c_checkpoint == "models/model-c-v2/model-c.pt"
     assert args.model_c_device == "cpu"
     assert args.puct_constant == 1.25
+    assert args.quiet_game_log is False
 
 
 def test_benchmark_can_create_fuegi_agent():

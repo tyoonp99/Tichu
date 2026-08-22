@@ -16,10 +16,11 @@
 
 ## 비교 순서
 
-1. Model C v2 vs Fuegi
-2. Model C v2 vs Fuegi-MCTS (고정 iteration 예산)
-3. Model C v2 vs Fuegi-MCTS (고정 턴 시간 예산)
-4. BC-guided MCTS vs Fuegi-MCTS (동일 iteration/시간 예산)
+1. Model C v2 vs Baseline B
+2. Model C v2 vs Fuegi
+3. Model C v2 vs Fuegi-MCTS (고정 iteration 예산)
+4. Model C v2 vs Fuegi-MCTS (고정 턴 시간 예산)
+5. BC-guided MCTS vs Fuegi-MCTS (동일 iteration/시간 예산)
 
 각 비교는 smoke 30쌍으로 실행 가능성을 확인한 뒤, 본 평가 200쌍 이상으로 확장한다.
 최종 승격 판정에는 본 평가와 별도 seed 구간을 사용한다.
@@ -62,6 +63,22 @@ docker compose run --rm --entrypoint python train-bc benchmark.py `
 
 원본 결과: `results/benchmarks/main/model-c-vs-fuegi-mcts-10iter-200seeds.csv`.
 이 수치는 고정 iteration 조건의 본 평가이며, 턴 시간 제한 조건의 결과와 혼용하지 않는다.
+
+## 본 평가 결과: Model C v2 vs Baseline B
+
+동결된 Model C v2와 2차 정밀 튜닝에서 선택한 Baseline B `wide.pt`를
+2026-08-22에 실행했다.
+
+- 조건: seed 75,000~75,199, seed당 좌석 교환 2게임, 목표 200점
+- 표본: 200 seed 쌍, 실제 400게임
+- Model C v2: 242승 151패 7무 (승률 60.50%), 평균 점수 차 +39.10
+- 좌석 교환 쌍 평균 점수 차의 95% 신뢰구간: +26.69 ~ +51.51
+- 좌석별 Model C v2 승수: 교환 전 121승, 교환 후 121승
+- 총 대국 시간: 160.49초 (게임당 평균 0.40초)
+
+원본 결과: `results/benchmarks/main/model-c-v2-vs-baseline-b-200seeds.csv`.
+신뢰구간 전체가 0보다 크므로 Model C v2를 Baseline B보다 강한 실제 대국 정책으로
+판정한다.
 
 ## 해석 원칙
 

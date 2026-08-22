@@ -1,7 +1,6 @@
 # 벤치마크 결과
 
-- `main/`: 본 평가. 현재 최종 파일은
-  `model-c-vs-fuegi-mcts-10iter-200seeds.csv`다.
+- `main/`: 본 평가. Model C v2의 Fuegi-MCTS 및 Baseline B 비교 결과를 둔다.
 - `smoke/model-c/`: Model C와 BC-guided MCTS의 소규모 통합 실험이다.
 - `archive/pre-model-c/`: 이전 Random·Fuegi·BC·MCTS 기준선 결과다.
 

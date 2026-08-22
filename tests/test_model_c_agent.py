@@ -78,6 +78,25 @@ def test_benchmark_factory_creates_model_c_agent(tmp_path, state_factory):
     assert isinstance(agent, ModelCAgent)
 
 
+def test_benchmark_factory_creates_model_c_v1_agent(tmp_path, state_factory):
+    state = state_factory(
+        [
+            {Card.TWO_JADE, Card.A_JADE},
+            {Card.THREE_JADE},
+            {Card.FOUR_JADE},
+            {Card.FIVE_JADE},
+        ]
+    )
+    checkpoint = tmp_path / "model-c-v1.pt"
+    make_model_c_checkpoint(checkpoint, state)
+
+    agent = make_agent(
+        "model-c-v1", model_c_v1_checkpoint=checkpoint, model_c_device="cpu"
+    )
+
+    assert isinstance(agent, ModelCAgent)
+
+
 def test_model_c_guided_mcts_uses_legal_actions_and_policy_prior(tmp_path, state_factory):
     state = state_factory(
         [
