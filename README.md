@@ -3,6 +3,18 @@ Implementation of the Tichu game and agents able to play it.
 
 -------------------------
 
+## 현재 프로젝트 경로
+
+현재 기준 엔진은 rules-v2이며, 최종 지도학습 정책은 Model C v2이다.
+
+- 개발 진행과 확정 결과: [milestone.md](./milestone.md)
+- 문서 안내: [docs/README.md](./docs/README.md)
+- Model C v2 대 Fuegi-MCTS 본 평가: [docs/benchmark-protocol.md](./docs/benchmark-protocol.md)
+- 재현 가능한 CSV·평가·튜닝 결과: [results/README.md](./results/README.md)
+
+`experiments/`, DQN 학습 스크립트와 일부 이전 에이전트는 보존된 legacy 연구 코드다.
+현재 AI 개발은 `nn_training/`의 Model C 코드와 `gym_agents/model_c.py`를 기준으로 한다.
+
 ## Run core regression tests with Docker
 
 Docker Desktop must be running. Build the test image and run the tests with:
@@ -33,7 +45,9 @@ docker compose run --rm tests python benchmark.py \
 `--games 10` means 10 seeded deals and 20 games after the seat-swapped
 rematches. See [milestone.md](./milestone.md) for the AI development roadmap.
 Available benchmark agents are `random`, `balanced-random`, `fuegi`, `mcts`,
-and `fuegi-mcts`.
+`fuegi-mcts`, `behavior-cloning`, `model-c`, and `model-c-guided-mcts`.
+Model C 계열은 PyTorch가 포함된 `train-bc` 서비스에서 실행한다. 최종 본 평가 명령과
+해석 조건은 [benchmark protocol](./docs/benchmark-protocol.md)을 따른다.
 
 ## Collect teacher decisions for learning
 
