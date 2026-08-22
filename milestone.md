@@ -116,7 +116,7 @@ Random, BalancedRandom, Fuegi, MCTS, Fuegi-MCTS를 구현해 BC와 후속 모델
 - 동결 Model C v2를 엔진의 합법 행동 점수화로 연결한 `ModelCAgent` 구현
 - `model-c`·Fuegi·Fuegi-MCTS를 고정 seed·좌석 교환으로 실행하는 벤치마크 등록
 - Model C vs Fuegi 1 seed(좌석 교환 2게임) 시범 대국 완료: 오류 0건,
-  `results/benchmarks/model-c-vs-fuegi-smoke.csv` 저장
+  `results/benchmarks/smoke/model-c/model-c-vs-fuegi-1seed.csv` 저장
 - Model C vs Fuegi 30쌍 smoke 완료: 57승 3패, 평균 점수 차 +201.83
 - Model C 점수를 PUCT prior로 사용하는 `ModelCGuidedMctsAgent` 구현,
   합법 행동·MCTS 회귀 테스트 19개 통과

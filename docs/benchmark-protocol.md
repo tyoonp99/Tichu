@@ -41,7 +41,7 @@ docker compose run --rm --entrypoint python train-bc benchmark.py `
   --target 100 `
   --model-c-checkpoint models/model-c-v2/model-c.pt `
   --model-c-device cpu `
-  --output results/benchmarks/model-c-vs-fuegi-smoke.csv
+  --output results/benchmarks/smoke/model-c/model-c-vs-fuegi-1seed.csv
 ```
 
 `--games`는 seed 개수이며, 각 seed마다 `swapped=False/True`가 모두 실행되므로 CSV와
@@ -60,7 +60,7 @@ docker compose run --rm --entrypoint python train-bc benchmark.py `
 - 상대 MCTS: 16,894회 검색 모두 요청한 10회 탐색을 완료
 - 총 대국 시간: 1,410.92초 (게임당 평균 3.53초)
 
-원본 결과: `results/benchmarks/model-c-vs-fuegi-mcts-10iter-main-200seeds.csv`.
+원본 결과: `results/benchmarks/main/model-c-vs-fuegi-mcts-10iter-200seeds.csv`.
 이 수치는 고정 iteration 조건의 본 평가이며, 턴 시간 제한 조건의 결과와 혼용하지 않는다.
 
 ## 해석 원칙

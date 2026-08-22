@@ -15,6 +15,9 @@ Implementation of the Tichu game and agents able to play it.
 `experiments/`, DQN 학습 스크립트와 일부 이전 에이전트는 보존된 legacy 연구 코드다.
 현재 AI 개발은 `nn_training/`의 Model C 코드와 `gym_agents/model_c.py`를 기준으로 한다.
 
+로컬 가중치는 `models/model-c-v2/model-c.pt`만 현재 최종 후보이며,
+새 실행 산출물은 `models/experiments/`, 이전 후보는 `models/archive/`에 둔다.
+
 ## Run core regression tests with Docker
 
 Docker Desktop must be running. Build the test image and run the tests with:

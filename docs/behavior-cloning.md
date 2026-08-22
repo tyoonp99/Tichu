@@ -31,7 +31,7 @@ docker compose run --rm train-bc `
   --epochs 1 `
   --max-train-records 2000 `
   --max-validation-records 500 `
-  --output models/behavior-cloning-smoke.pt
+  --output models/experiments/behavior-cloning-smoke.pt
 ```
 
 `train-bc` 서비스는 NVIDIA GPU 한 개를 예약합니다. CUDA가 정상 연결되면
@@ -59,7 +59,7 @@ docker compose run --rm train-bc `
   --device cuda `
   --epochs 5 `
   --batch-size 64 `
-  --output models/behavior-cloning-v1.pt
+  --output models/experiments/behavior-cloning-v1.pt
 ```
 
 검증 loss가 가장 낮은 epoch만 체크포인트로 저장합니다. `models/`와
@@ -87,8 +87,8 @@ docker compose run --rm --entrypoint python train-bc benchmark.py `
   --games 20 `
   --seed 50000 `
   --target 200 `
-  --bc-checkpoint models/behavior-cloning-v1.pt `
-  --output results/benchmarks/behavior-cloning-vs-fuegi-20.csv
+  --bc-checkpoint models/experiments/behavior-cloning-v1.pt `
+  --output results/benchmarks/smoke/behavior-cloning/behavior-cloning-vs-fuegi-20.csv
 ```
 
 각 seed는 좌석을 바꿔 두 번 실행됩니다. `--games 20`은 실제 결과 행
@@ -139,8 +139,8 @@ docker compose run --rm --entrypoint python train-bc `
 각 후보는 validation Top-1을 우선으로, 동률이면 validation loss가 더 낮은 epoch를
 checkpoint로 저장한다. 실행 중에는 매 후보 뒤에 다음 파일이 갱신된다.
 
-- results/tuning/baseline-b-v2/summary.json
-- results/tuning/baseline-b-v2/summary.csv
+- results/tuning/archive/baseline-b-v2/summary.json
+- results/tuning/archive/baseline-b-v2/summary.csv
 
 먼저 파이프라인만 확인하려면 전체 feature schema와 전체 epoch 대신 작은 표본을 쓴다.
 
@@ -149,6 +149,6 @@ docker compose run --rm --entrypoint python train-bc `
   nn_training/tune_baseline_b.py `
   --device cuda `
   --dry-run `
-  --output-dir results/tuning/baseline-b-v2-smoke `
-  --model-dir models/baseline-b-v2-tuning-smoke
+  --output-dir results/tuning/experiments/baseline-b-v2-smoke `
+  --model-dir models/experiments/baseline-b-v2-tuning-smoke
 ~~~
