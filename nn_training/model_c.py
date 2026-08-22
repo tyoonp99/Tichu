@@ -251,9 +251,8 @@ class ModelCPolicy(nn.Module):
         card_summary = (card_tokens * card_mask.unsqueeze(-1)).sum(dim=-2) / denominator
         return self.action_project(torch.cat((card_summary, self.action_type_embedding(action_type), self.combination_embedding(combination), self.player_embedding(player), numeric), dim=-1))
 
-    def forward(self, batch: ModelCBatch):
-        if not torch.all(batch.legal_action_mask.any(dim=1)):
-            raise ValueError("every decision requires one legal action")
+    def encode_state(self, batch: ModelCBatch):
+        """Encode only the observation part shared by every legal candidate."""
         hand = self._card_tokens(batch.hand_cards)
         hand_padding = ~batch.hand_mask
         for block in self.hand_blocks:
@@ -268,7 +267,21 @@ class ModelCPolicy(nn.Module):
         _, hidden = self.trick_gru(packed)
         trick_summary = torch.cat((hidden[-2], hidden[-1]), dim=-1)
         trick_summary = trick_summary * lengths.gt(0).unsqueeze(-1)
-        state = self.state_encoder(torch.cat((hand_summary.squeeze(1), trick_summary, self.public_encoder(batch.public)), dim=-1))
+        return self.state_encoder(
+            torch.cat(
+                (hand_summary.squeeze(1), trick_summary, self.public_encoder(batch.public)),
+                dim=-1,
+            )
+        )
+
+    def forward(self, batch: ModelCBatch):
+        if not torch.all(batch.legal_action_mask.any(dim=1)):
+            raise ValueError("every decision requires one legal action")
+        state = self.encode_state(batch)
+        return self.score_candidates(batch, state)
+
+    def score_candidates(self, batch: ModelCBatch, state):
+        """Score legal candidates using a precomputed observation encoding."""
         candidates = self._actions(batch.candidate_type, batch.candidate_combination, batch.candidate_player, batch.candidate_cards, batch.candidate_card_mask, batch.candidate_numeric)
         state = state.unsqueeze(1).expand_as(candidates)
         joint = torch.cat((state, candidates, state * candidates, torch.abs(state - candidates)), dim=-1)

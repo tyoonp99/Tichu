@@ -6,5 +6,6 @@ from .fuegi import FuegiActionScorer, FuegiHeuristicAgent, FuegiMctsAgent
 from .behavior_cloning import BehaviorCloningAgent
 from .baseline_b import BaselineBAgent
 from .model_c import ModelCAgent
+from .model_c_rl import ModelCPPOAgent
 from .model_c_mcts import ModelCGuidedMctsAgent
 

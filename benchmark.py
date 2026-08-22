@@ -17,6 +17,7 @@ from gym_agents import (
     FuegiHeuristicAgent,
     FuegiMctsAgent,
     ModelCAgent,
+    ModelCPPOAgent,
     ModelCGuidedMctsAgent,
     RandomAgent,
 )
@@ -33,6 +34,7 @@ AGENT_NAMES = (
     "baseline-b",
     "model-c-v1",
     "model-c",
+    "model-c-rl",
     "model-c-guided-mcts",
 )
 
@@ -48,6 +50,8 @@ def make_agent(
     baseline_b_device="cpu",
     model_c_checkpoint="models/model-c-v2/model-c.pt",
     model_c_device="cpu",
+    model_c_rl_checkpoint="models/experiments/model-c-ppo.pt",
+    model_c_rl_device="cpu",
     model_c_v1_checkpoint="models/archive/model-c-v1/checkpoints/model-c.pt",
     puct_constant=1.25,
 ):
@@ -79,6 +83,8 @@ def make_agent(
         return BaselineBAgent(baseline_b_checkpoint, device=baseline_b_device)
     if name == "model-c":
         return ModelCAgent(model_c_checkpoint, device=model_c_device)
+    if name == "model-c-rl":
+        return ModelCPPOAgent(model_c_rl_checkpoint, device=model_c_rl_device)
     if name == "model-c-v1":
         return ModelCAgent(model_c_v1_checkpoint, device=model_c_device)
     if name == "model-c-guided-mcts":
@@ -108,6 +114,8 @@ def play_game(
     baseline_b_device="cpu",
     model_c_checkpoint="models/model-c-v2/model-c.pt",
     model_c_device="cpu",
+    model_c_rl_checkpoint="models/experiments/model-c-ppo.pt",
+    model_c_rl_device="cpu",
     model_c_v1_checkpoint="models/archive/model-c-v1/checkpoints/model-c.pt",
     puct_constant=1.25,
 ):
@@ -116,10 +124,10 @@ def play_game(
     random.seed(seed)
     even_team, odd_team = (team_b, team_a) if swap_seats else (team_a, team_b)
     agents = [
-        make_agent(even_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device, baseline_b_checkpoint=baseline_b_checkpoint, baseline_b_device=baseline_b_device, model_c_checkpoint=model_c_checkpoint, model_c_device=model_c_device, model_c_v1_checkpoint=model_c_v1_checkpoint, puct_constant=puct_constant),
-        make_agent(odd_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device, baseline_b_checkpoint=baseline_b_checkpoint, baseline_b_device=baseline_b_device, model_c_checkpoint=model_c_checkpoint, model_c_device=model_c_device, model_c_v1_checkpoint=model_c_v1_checkpoint, puct_constant=puct_constant),
-        make_agent(even_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device, baseline_b_checkpoint=baseline_b_checkpoint, baseline_b_device=baseline_b_device, model_c_checkpoint=model_c_checkpoint, model_c_device=model_c_device, model_c_v1_checkpoint=model_c_v1_checkpoint, puct_constant=puct_constant),
-        make_agent(odd_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device, baseline_b_checkpoint=baseline_b_checkpoint, baseline_b_device=baseline_b_device, model_c_checkpoint=model_c_checkpoint, model_c_device=model_c_device, model_c_v1_checkpoint=model_c_v1_checkpoint, puct_constant=puct_constant),
+        make_agent(even_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device, baseline_b_checkpoint=baseline_b_checkpoint, baseline_b_device=baseline_b_device, model_c_checkpoint=model_c_checkpoint, model_c_device=model_c_device, model_c_rl_checkpoint=model_c_rl_checkpoint, model_c_rl_device=model_c_rl_device, model_c_v1_checkpoint=model_c_v1_checkpoint, puct_constant=puct_constant),
+        make_agent(odd_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device, baseline_b_checkpoint=baseline_b_checkpoint, baseline_b_device=baseline_b_device, model_c_checkpoint=model_c_checkpoint, model_c_device=model_c_device, model_c_rl_checkpoint=model_c_rl_checkpoint, model_c_rl_device=model_c_rl_device, model_c_v1_checkpoint=model_c_v1_checkpoint, puct_constant=puct_constant),
+        make_agent(even_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device, baseline_b_checkpoint=baseline_b_checkpoint, baseline_b_device=baseline_b_device, model_c_checkpoint=model_c_checkpoint, model_c_device=model_c_device, model_c_rl_checkpoint=model_c_rl_checkpoint, model_c_rl_device=model_c_rl_device, model_c_v1_checkpoint=model_c_v1_checkpoint, puct_constant=puct_constant),
+        make_agent(odd_team, iterations=iterations, max_time=max_time, bc_checkpoint=bc_checkpoint, bc_device=bc_device, baseline_b_checkpoint=baseline_b_checkpoint, baseline_b_device=baseline_b_device, model_c_checkpoint=model_c_checkpoint, model_c_device=model_c_device, model_c_rl_checkpoint=model_c_rl_checkpoint, model_c_rl_device=model_c_rl_device, model_c_v1_checkpoint=model_c_v1_checkpoint, puct_constant=puct_constant),
     ]
     game = TichuGame(*agents)
     started = perf_counter()
@@ -193,6 +201,8 @@ def run_benchmark(
     baseline_b_device="cpu",
     model_c_checkpoint="models/model-c-v2/model-c.pt",
     model_c_device="cpu",
+    model_c_rl_checkpoint="models/experiments/model-c-ppo.pt",
+    model_c_rl_device="cpu",
     model_c_v1_checkpoint="models/archive/model-c-v1/checkpoints/model-c.pt",
     puct_constant=1.25,
     show_progress=False,
@@ -218,6 +228,8 @@ def run_benchmark(
                 baseline_b_device=baseline_b_device,
                 model_c_checkpoint=model_c_checkpoint,
                 model_c_device=model_c_device,
+                model_c_rl_checkpoint=model_c_rl_checkpoint,
+                model_c_rl_device=model_c_rl_device,
                 model_c_v1_checkpoint=model_c_v1_checkpoint,
                 puct_constant=puct_constant,
             )
@@ -318,6 +330,12 @@ def build_parser():
         "--model-c-device", choices=("cpu", "cuda", "auto"), default="cpu"
     )
     parser.add_argument(
+        "--model-c-rl-checkpoint", default="models/experiments/model-c-ppo.pt"
+    )
+    parser.add_argument(
+        "--model-c-rl-device", choices=("cpu", "cuda", "auto"), default="cpu"
+    )
+    parser.add_argument(
         "--model-c-v1-checkpoint",
         default="models/archive/model-c-v1/checkpoints/model-c.pt",
     )
@@ -349,6 +367,8 @@ def main(argv=None):
         baseline_b_device=args.baseline_b_device,
         model_c_checkpoint=args.model_c_checkpoint,
         model_c_device=args.model_c_device,
+        model_c_rl_checkpoint=args.model_c_rl_checkpoint,
+        model_c_rl_device=args.model_c_rl_device,
         model_c_v1_checkpoint=args.model_c_v1_checkpoint,
         puct_constant=args.puct_constant,
         show_progress=True,

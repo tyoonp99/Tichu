@@ -26,6 +26,8 @@ def test_benchmark_parser_configures_paired_matches():
     assert args.baseline_b_device == "cpu"
     assert args.model_c_checkpoint == "models/model-c-v2/model-c.pt"
     assert args.model_c_device == "cpu"
+    assert args.model_c_rl_checkpoint == "models/experiments/model-c-ppo.pt"
+    assert args.model_c_rl_device == "cpu"
     assert args.puct_constant == 1.25
     assert args.quiet_game_log is False
 
