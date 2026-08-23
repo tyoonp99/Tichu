@@ -8,6 +8,7 @@ Implementation of the Tichu game and agents able to play it.
 현재 기준 엔진은 rules-v2이며, 최종 지도학습 정책은 Model C v2이다.
 
 - 개발 진행과 확정 결과: [milestone.md](./milestone.md)
+- 프로젝트 최종 보고서: [docs/final-report.md](./docs/final-report.md)
 - 문서 안내: [docs/README.md](./docs/README.md)
 - Model C v2 대 Fuegi-MCTS 본 평가: [docs/benchmark-protocol.md](./docs/benchmark-protocol.md)
 - 재현 가능한 CSV·평가·튜닝 결과: [results/README.md](./results/README.md)

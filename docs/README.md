@@ -1,7 +1,8 @@
 # 문서 안내
 
-현재 개발과 재현에 필요한 문서는 아래 네 개다.
+현재 개발과 재현에 필요한 문서는 아래 다섯 개다.
 
+- `final-report.md`: 프로젝트 전체 결과, 한계, 최종 종료 결론
 - `benchmark-protocol.md`: 좌석 교환 벤치마크 방법과 Model C v2 본 평가 결과
 - `training-dataset-v2.md`: Brettspielwelt 인간 로그의 rules-v2 데이터셋 스키마·분할
 - `behavior-cloning.md`: 지도학습 모델, 튜닝, 평가 실행 방법
