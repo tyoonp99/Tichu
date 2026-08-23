@@ -43,6 +43,24 @@ class SelfPlayTrajectory:
             done=True,
         )
 
+    def reward_trick(self, start_index, *, winner, trick_points, scale=100.0, weight=1.0):
+        """Assign actual captured trick points to the latest learner action.
+
+        The reward is team-relative and deliberately does not invent a heuristic:
+        it is positive only when the learner's team receives a scored trick, and
+        negative when the opponent receives one.  A zero-point trick is retained
+        as a no-op because it carries no score signal under Tichu's rules.
+        """
+        if start_index == len(self.transitions) or not trick_points:
+            return
+        index = len(self.transitions) - 1
+        transition = self.transitions[index]
+        sign = 1.0 if transition.player % 2 == winner % 2 else -1.0
+        self.transitions[index] = replace(
+            transition,
+            reward=transition.reward + sign * weight * trick_points / scale,
+        )
+
     def finish(self, *, gamma=1.0, gae_lambda=0.95):
         """Return round-aware GAE targets for this game's learner decisions."""
         return compute_gae(self.transitions, gamma=gamma, gae_lambda=gae_lambda)

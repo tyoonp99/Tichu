@@ -15,6 +15,7 @@ import numpy as np
 import torch
 
 from gamemanager import TichuGame
+from gym_tichu.envs.internals import GiveDragonAwayAction, WinTrickAction
 from gym_agents.baseline_b import BaselineBAgent
 from gym_agents.model_c import ModelCAgent
 from gym_agents.model_c_rl import ModelCPPOAgent
@@ -50,6 +51,7 @@ def collect_game(
     learner_on_even_team,
     gamma,
     gae_lambda,
+    trick_reward_weight=0.0,
 ):
     """Play one game and return learner actions with round-level team rewards."""
     trajectory = SelfPlayTrajectory()
@@ -72,7 +74,29 @@ def collect_game(
     try:
         while points[0] < target_points and points[1] < target_points:
             start_index = len(trajectory.transitions)
-            round_points, _ = game._start_round(seed=seed + round_number)
+            trick_start_index = start_index
+
+            def on_transition(_state_before, action, _state_after, _done):
+                nonlocal trick_start_index
+                if not isinstance(action, WinTrickAction):
+                    return
+                winner = (
+                    action.to
+                    if isinstance(action, GiveDragonAwayAction)
+                    else action.player_pos
+                )
+                trajectory.reward_trick(
+                    trick_start_index,
+                    winner=winner,
+                    trick_points=action.trick.points,
+                    weight=trick_reward_weight,
+                )
+                trick_start_index = len(trajectory.transitions)
+
+            round_points, _ = game._start_round(
+                seed=seed + round_number,
+                transition_callback=on_transition,
+            )
             trajectory.reward_round(start_index, round_points)
             points = (
                 points[0] + round_points[0],
@@ -130,6 +154,10 @@ def build_parser():
     )
     parser.add_argument("--gamma", type=float, default=1.0)
     parser.add_argument("--gae-lambda", type=float, default=0.95)
+    parser.add_argument(
+        "--trick-reward-weight", type=float, default=0.0,
+        help="weight for team-relative, actual trick-point shaping rewards",
+    )
     parser.add_argument("--seed", type=int, default=80000)
     parser.add_argument("--device", choices=("auto", "cpu", "cuda"), default="auto")
     parser.add_argument("--quiet-game-log", action="store_true")
@@ -271,6 +299,7 @@ def main(argv=None):
                 learner_on_even_team=(episode % 2 == 0),
                 gamma=args.gamma,
                 gae_lambda=args.gae_lambda,
+                trick_reward_weight=args.trick_reward_weight,
             )
             transitions.extend(game_transitions)
             games.append(game)

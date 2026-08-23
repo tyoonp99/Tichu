@@ -74,7 +74,7 @@ class TichuGame(object):
 
         return GameOutcome(points, round_histories)
 
-    def _start_round(self, seed=None)->Tuple[Tuple[int, int], Any]:
+    def _start_round(self, seed=None, transition_callback=None)->Tuple[Tuple[int, int], Any]:
         start_t = time()
         console_logger.info("[ROUND START] Start round...")
 
@@ -137,8 +137,13 @@ class TichuGame(object):
                 console_logger.debug("[Time: {}]".format(time_since(since=loop_start_t)))
 
             # APPLY THE ACTION
+            state_before_action = curr_state
             curr_state, reward, terminated, truncated, info = self.env.step(chosen_action)
             done = terminated or truncated
+            if transition_callback is not None:
+                transition_callback(
+                    state_before_action, chosen_action, curr_state, done
+                )
             if len(curr_state.handcards[current_player]) == 0:
                 console_logger.info("[FINISH] player {} just finished. -> new ranking: {}".format(current_player, curr_state.ranking))
 

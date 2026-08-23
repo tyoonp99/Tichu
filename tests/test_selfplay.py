@@ -120,6 +120,19 @@ def test_round_rewards_use_the_player_team_perspective():
     assert trajectory.transitions[1].done is True
 
 
+def test_trick_rewards_use_actual_points_and_the_winning_team():
+    trajectory = SelfPlayTrajectory()
+    record = records()[0]
+    trajectory.append(SelfPlayTransition(record, 0, 0.0, 0.0, 0.0))
+    trajectory.append(SelfPlayTransition(record, 2, 0.0, 0.0, 0.0))
+
+    trajectory.reward_trick(0, winner=1, trick_points=25, weight=1.0)
+
+    assert trajectory.transitions[0].reward == 0.0
+    assert trajectory.transitions[1].reward == pytest.approx(-0.25)
+    assert trajectory.transitions[1].done is False
+
+
 def test_gae_propagates_a_round_reward_back_to_earlier_team_actions():
     record = records()[0]
     transitions = [
