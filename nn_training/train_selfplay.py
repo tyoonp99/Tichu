@@ -102,6 +102,10 @@ def build_parser():
     parser.add_argument("--base-checkpoint", default="models/model-c-v2/model-c.pt")
     parser.add_argument("--baseline-b-checkpoint", default="models/archive/baseline-b-v2/refine/wide.pt")
     parser.add_argument("--output", default="models/experiments/model-c-ppo.pt")
+    parser.add_argument(
+        "--resume-checkpoint",
+        help="resume actor/value weights from a saved PPO checkpoint; optimizer state is reset",
+    )
     parser.add_argument("--updates", type=int, default=20)
     parser.add_argument("--episodes-per-update", type=int, default=8)
     parser.add_argument("--target", type=int, default=200, dest="target_points")
@@ -119,6 +123,11 @@ def build_parser():
     parser.add_argument("--evaluation-games", type=int, default=30)
     parser.add_argument("--evaluation-seed", type=int, default=83000)
     parser.add_argument("--evaluation-output-dir", default="results/benchmarks/smoke/selfplay")
+    parser.add_argument(
+        "--stop-on-significant-evaluation",
+        action="store_true",
+        help="stop when the paired 95%% confidence interval excludes zero",
+    )
     parser.add_argument("--gamma", type=float, default=1.0)
     parser.add_argument("--gae-lambda", type=float, default=0.95)
     parser.add_argument("--seed", type=int, default=80000)
@@ -207,9 +216,16 @@ def main(argv=None):
     if args.quiet_game_log:
         logging.getLogger("console_logger").setLevel(logging.CRITICAL + 1)
 
-    actor_critic, base_saved = ModelCActorCritic.from_model_c_checkpoint(
-        args.base_checkpoint, map_location="cpu"
-    )
+    if args.resume_checkpoint:
+        actor_critic, base_saved = ModelCActorCritic.from_selfplay_checkpoint(
+            args.resume_checkpoint, map_location="cpu"
+        )
+        starting_update = base_saved["update"]
+    else:
+        actor_critic, base_saved = ModelCActorCritic.from_model_c_checkpoint(
+            args.base_checkpoint, map_location="cpu"
+        )
+        starting_update = 0
     schema = FeatureSchema.from_dict(base_saved["feature_schema"])
     encoder = ModelCEncoder(schema)
     actor_critic = actor_critic.to(device)
@@ -229,12 +245,13 @@ def main(argv=None):
         "episodes_per_update": args.episodes_per_update,
         "opponents": opponents,
         "snapshot_count": len(snapshot_paths),
+        "starting_update": starting_update,
         "parameters": sum(parameter.numel() for parameter in actor_critic.parameters()),
         "dry_run": args.dry_run,
     }, sort_keys=True), flush=True)
 
     started = time.monotonic()
-    for update in range(1, args.updates + 1):
+    for update in range(starting_update + 1, args.updates + 1):
         transitions = []
         games = []
         for episode in range(args.episodes_per_update):
@@ -311,7 +328,21 @@ def main(argv=None):
             )
             snapshot_paths.append(snapshot_path)
         if update % args.evaluation_interval == 0:
-            print(json.dumps(evaluate_checkpoint(args, args.output, update), sort_keys=True), flush=True)
+            evaluation = evaluate_checkpoint(args, args.output, update)
+            print(json.dumps(evaluation, sort_keys=True), flush=True)
+            lower = evaluation["paired_ci95_lower"]
+            upper = evaluation["paired_ci95_upper"]
+            if args.stop_on_significant_evaluation and (
+                (lower is not None and lower > 0) or (upper is not None and upper < 0)
+            ):
+                print(json.dumps({
+                    "event": "early_stop",
+                    "reason": "paired_ci95_excludes_zero",
+                    "update": update,
+                    "paired_ci95_lower": lower,
+                    "paired_ci95_upper": upper,
+                }, sort_keys=True), flush=True)
+                break
     print(json.dumps({"event": "complete", "output": str(Path(args.output))}, sort_keys=True))
 
 

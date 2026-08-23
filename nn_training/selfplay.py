@@ -42,6 +42,19 @@ class ModelCActorCritic(nn.Module):
         policy.load_state_dict(saved["model_state"])
         return cls(policy), saved
 
+    @classmethod
+    def from_selfplay_checkpoint(cls, checkpoint, *, map_location="cpu"):
+        """Restore an actor-critic checkpoint produced by this module."""
+        saved = torch.load(checkpoint, map_location=map_location, weights_only=True)
+        if saved.get("model") != SELFPLAY_CHECKPOINT_NAME:
+            raise ValueError("checkpoint is not a PPO self-play actor-critic")
+        instance = cls(
+            ModelCPolicy(**saved["model_config"]["policy_config"]),
+            value_hidden_size=saved["model_config"]["value_hidden_size"],
+        )
+        instance.load_state_dict(saved["model_state"])
+        return instance, saved
+
     def config(self):
         return {
             "policy_config": self.policy.config(),

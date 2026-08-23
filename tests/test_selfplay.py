@@ -210,3 +210,21 @@ def test_ppo_agent_loads_checkpoint_and_returns_a_legal_engine_action(tmp_path, 
     chosen = agent.action(state)
 
     assert chosen in state.possible_actions_set
+
+
+def test_actor_critic_restores_its_own_checkpoint(tmp_path):
+    actor_critic, encoder = make_actor_critic()
+    checkpoint = tmp_path / "selfplay.pt"
+    save_selfplay_checkpoint(
+        checkpoint,
+        actor_critic=actor_critic,
+        feature_schema=encoder.schema,
+        base_checkpoint="model-c.pt",
+        update=3,
+        metrics={},
+    )
+
+    restored, saved = ModelCActorCritic.from_selfplay_checkpoint(checkpoint)
+
+    assert saved["update"] == 3
+    assert restored.config() == actor_critic.config()
