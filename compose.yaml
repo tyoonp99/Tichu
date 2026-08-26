@@ -26,3 +26,16 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "8080:8080"
+    environment:
+      PYTHONHASHSEED: "0"
+      TICHU_MODEL_CHECKPOINT: /app/models/model-c-v2/model-c.pt
+      TICHU_MODEL_DEVICE: cpu

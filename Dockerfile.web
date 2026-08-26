@@ -1,0 +1,16 @@
+FROM tichu-train-bc:latest
+
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app/gym-tichu:/app
+
+COPY requirements-web.txt ./
+RUN pip install --no-cache-dir -r requirements-web.txt
+
+COPY . .
+
+EXPOSE 8080
+ENTRYPOINT []
+CMD ["uvicorn", "web_game.app:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -7,17 +7,23 @@ Implementation of the Tichu game and agents able to play it.
 
 현재 기준 엔진은 rules-v2이며, 최종 지도학습 정책은 Model C v2이다.
 
-- 개발 진행과 확정 결과: [milestone.md](./milestone.md)
-- 프로젝트 최종 보고서: [docs/final-report.md](./docs/final-report.md)
+- 프로젝트 최종 보고서: [docs/PORTFOLIO_CASE_STUDY_KO.md](./docs/PORTFOLIO_CASE_STUDY_KO.md)
 - 문서 안내: [docs/README.md](./docs/README.md)
 - Model C v2 대 Fuegi-MCTS 본 평가: [docs/benchmark-protocol.md](./docs/benchmark-protocol.md)
 - 재현 가능한 CSV·평가·튜닝 결과: [results/README.md](./results/README.md)
+- 사람 2명 vs Model C v2 웹 시험판: [docs/web-play.md](./docs/web-play.md)
 
 `experiments/`, DQN 학습 스크립트와 일부 이전 에이전트는 보존된 legacy 연구 코드다.
 현재 AI 개발은 `nn_training/`의 Model C 코드와 `gym_agents/model_c.py`를 기준으로 한다.
 
 로컬 가중치는 `models/model-c-v2/model-c.pt`만 현재 최종 후보이며,
 새 실행 산출물은 `models/experiments/`, 이전 후보는 `models/archive/`에 둔다.
+
+## Play in a browser (two humans vs Model C v2)
+
+로컬 웹 시험판은 사람 0번·2번이 파트너가 되어 Model C v2 두 자리와 한 라운드를
+플레이한다. 시작 방법과 원격 친구 초대(Cloudflare Tunnel) 방법은
+[웹 플레이 안내](./docs/web-play.md)를 따른다.
 
 ## Run core regression tests with Docker
 
@@ -47,7 +53,8 @@ docker compose run --rm tests python benchmark.py \
 ```
 
 `--games 10` means 10 seeded deals and 20 games after the seat-swapped
-rematches. See [milestone.md](./milestone.md) for the AI development roadmap.
+rematches. 최종 모델 선택 과정과 실험 결과는
+[프로젝트 최종 보고서](./docs/PORTFOLIO_CASE_STUDY_KO.md)에 정리했다.
 Available benchmark agents are `random`, `balanced-random`, `fuegi`, `mcts`,
 `fuegi-mcts`, `behavior-cloning`, `model-c`, and `model-c-guided-mcts`.
 Model C 계열은 PyTorch가 포함된 `train-bc` 서비스에서 실행한다. 최종 본 평가 명령과
@@ -74,8 +81,8 @@ See [docs/training-dataset-v2.md](./docs/training-dataset-v2.md) for the schema
 and privacy rules. Generated datasets are intentionally ignored by Git.
 
 The verified Brettspielwelt decisions can also train a supervised legal-action
-ranking baseline. See [docs/behavior-cloning.md](./docs/behavior-cloning.md) for
-the Docker smoke test, full training command, and validation metrics.
+ranking baseline. 초기 BC v1 학습 기록은
+[archive/behavior-cloning.md](./docs/archive/behavior-cloning.md)에 보관했다.
 
 ## Download recent Brettspielwelt logs
 

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Tichu · 사람 2명 vs AI</title>
+    <link rel="stylesheet" href="/static/style.css">
+  </head>
+  <body>
+    <main>
+      <h1>Tichu <small>사람 vs Model C v2</small></h1>
+      <section id="lobby">
+        <button id="create-single">혼자 하기</button>
+        <button id="create-friends">친구와 하기</button>
+        <p><b>혼자 하기</b>는 나 1명 + Model C v2 3명입니다. <b>친구와 하기</b>는 0·2번 사람이 파트너가 됩니다.</p>
+      </section>
+      <section id="game" hidden>
+        <p id="room"></p>
+        <p id="invite" class="invite"></p>
+        <div class="status" id="status"></div>
+        <div class="reaction-timer" id="reaction-timer" hidden>
+          <span id="reaction-label"></span>
+          <div class="reaction-track"><i id="reaction-fill"></i></div>
+        </div>
+        <div class="event-banner" id="event-banner" hidden></div>
+        <section class="board" aria-label="티츄 테이블">
+          <div class="seat top" id="seat-2"></div>
+          <div class="seat left" id="seat-3"></div>
+          <div class="table-area">
+            <p class="table-title">테이블</p>
+            <p class="table-info" id="table-player"></p>
+            <p class="table-points" id="table-points"></p>
+            <div class="table-cards" id="table-cards">비어 있음</div>
+            <p class="table-combination" id="table"></p>
+            <p class="wish" id="wish" hidden></p>
+          </div>
+          <div class="seat right" id="seat-1"></div>
+          <div class="seat bottom" id="seat-0"></div>
+        </section>
+        <section class="controls">
+          <h2>내 손패 <small>카드를 눌러 선택하세요</small></h2>
+          <div class="hand" id="hand"></div>
+          <div class="selection" id="selection">선택한 카드가 없습니다.</div>
+          <div class="play-controls" id="actions"></div>
+          <div class="bomb-actions" id="bomb-actions" hidden>
+            <strong>지금 낼 수 있는 폭탄</strong>
+            <div id="bomb-buttons"></div>
+          </div>
+          <div id="prompt"></div>
+        </section>
+        <details class="game-log">
+          <summary>진행 로그</summary>
+          <ol id="log"></ol>
+        </details>
+      </section>
+    </main>
+    <script src="/static/app.js?v=10"></script>
+  </body>
+</html>

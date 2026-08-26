@@ -13,3 +13,5 @@ scraper/*.csv
 scraper/*.ipynb
 **/*.h5f
 **/*.pkl
+models/
+datasets/
